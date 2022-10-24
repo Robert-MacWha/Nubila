@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "Ff0Das/K9FsD0kTzVf+vPQoR6FqI+v4gaDXWB/KFPvUXW9LuoT7H0RXtM6uwwLWuRC1pnevUpuDqHQV2orDSeQ==",
+  "success": true,
+  "projectFilePath": "D:\\Projects\\C#\\Delphi\\Delphi\\Delphi.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\trebo\\.nuget\\packages\\microsoft.win32.systemevents\\6.0.0\\microsoft.win32.systemevents.6.0.0.nupkg.sha512",
+    "C:\\Users\\trebo\\.nuget\\packages\\system.drawing.common\\6.0.0\\system.drawing.common.6.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

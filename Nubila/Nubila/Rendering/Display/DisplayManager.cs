@@ -7,12 +7,14 @@ namespace Nubila
 {
     static class DisplayManager
     {
-        public static Window Window;
-        public static Vector2 WindowSize;
+        public static Window window;
+        public static Vector2 windowSize;
+        public static float aspectRatio;
 
-        public static void CreateWindow(int width = 800, int height = 600, string title = "New Window", int vsync = 0)
+        public static void CreateWindow(int width = 800, int height = 600, string title = "New Window", int vsync = 1)
         {
-            WindowSize = new Vector2(width, height);
+            windowSize = new Vector2(width, height);
+            aspectRatio = (float)width / (float)height;
 
             // GLFW initialization
             Glfw.Init();
@@ -24,20 +26,18 @@ namespace Nubila
             Glfw.WindowHint(Hint.Resizable, false);
 
             // create new window
-            Window = Glfw.CreateWindow(width, height, title, GLFW.Monitor.None, Window.None);
-            if (Window == Window.None)
+            window = Glfw.CreateWindow(width, height, title, GLFW.Monitor.None, Window.None);
+            if (window == Window.None)
             {
                 // window creation failed
                 return;
             }
+            Glfw.MakeContextCurrent(window);
 
-            Glfw.MakeContextCurrent(Window);
             gl.LoadOpenGL();
-
             gl.Viewport(0, 0, width, height);
             Glfw.SwapInterval(vsync);
         }
-
 
         public static void PreRender()
         {
@@ -47,7 +47,7 @@ namespace Nubila
 
         public static void PostRender()
         {
-            Glfw.SwapBuffers(Window);
+            Glfw.SwapBuffers(window);
         }
 
         public static void DestroyWindow()

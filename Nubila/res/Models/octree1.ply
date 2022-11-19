@@ -1,0 +1,20 @@
+ply
+format ascii 1.0
+comment : MagicaVoxel @ Ephtracy
+element vertex 9
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+end_header
+0 0 0 153 204 255
+1 0 0 153 204 255
+-2 1 0 153 204 255
+0 1 0 153 204 255
+1 1 0 153 204 255
+0 0 1 153 204 255
+1 0 1 153 204 255
+0 1 1 153 204 255
+1 1 1 153 204 255

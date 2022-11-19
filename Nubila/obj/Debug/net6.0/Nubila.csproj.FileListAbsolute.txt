@@ -21,3 +21,17 @@ D:\Github\Nubila\Nubila\obj\Debug\net6.0\refint\Nubila.dll
 D:\Github\Nubila\Nubila\obj\Debug\net6.0\Nubila.pdb
 D:\Github\Nubila\Nubila\obj\Debug\net6.0\Nubila.genruntimeconfig.cache
 D:\Github\Nubila\Nubila\obj\Debug\net6.0\ref\Nubila.dll
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\test.frag
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\test.vert
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\test.jpg
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\test-small.jpg
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\render.comp
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\test.txt
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\skybox.jpg
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\skybox-1920.png
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\3x3x3.ply
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\octree1.ply
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\octree.ply
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\cars.ply
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\monu1.ply
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\monu2.ply

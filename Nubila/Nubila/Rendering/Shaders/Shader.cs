@@ -13,7 +13,7 @@ namespace Nubila
         {
             { "vert", glShaderType.VERTEX_SHADER },
             { "frag", glShaderType.FRAGMENT_SHADER },
-            { "comp", glShaderType.VERTEX_SHADER }
+            { "comp", glShaderType.COMPUTE_SHADER }
         };
 
 
@@ -27,7 +27,7 @@ namespace Nubila
             }
             else
             {
-                m_file = "";
+                throw new Exception("Could not find shader type in lookup table");
             }
         }
 
@@ -35,10 +35,7 @@ namespace Nubila
         {
             gl.DeleteShader(m_id);
 
-            if (m_file == "")
-                return 0;
-
-            string shaderText = File.ReadAllText(m_file);
+            string shaderText = File.ReadAllText(m_file); 
 
             m_id = gl.CreateShader(m_type);
             gl.ShaderSource(m_id, shaderText);

@@ -1,8 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "by/tOFssFA6hi518/L8v43zdkuuCehj/lU5vGIwslQcFr1ugswnM188jaOOk8Rwx+MUT4mARyJyCRtm1Zwp9kw==",
+  "dgSpecHash": "9PJUgSfOoukE49JmNRnWcJTvMw1rijzEXMsob7gaJWwbeQG8nlxJHSdaPaGfM7BWkYQqwwWS8+XqmvDWe9MsXg==",
   "success": true,
   "projectFilePath": "D:\\Github\\Nubila\\Nubila\\Nubila.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\trebo\\.nuget\\packages\\microsoft.win32.systemevents\\6.0.0\\microsoft.win32.systemevents.6.0.0.nupkg.sha512",
+    "C:\\Users\\trebo\\.nuget\\packages\\system.drawing.common\\6.0.0\\system.drawing.common.6.0.0.nupkg.sha512"
+  ],
   "logs": []
 }

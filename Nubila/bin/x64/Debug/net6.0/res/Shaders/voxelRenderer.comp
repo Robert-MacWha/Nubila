@@ -1,0 +1,281 @@
+﻿#version 430 core
+layout(local_size_x = 32, local_size_y = 16, local_size_z = 1) in;
+
+layout(rgba32f, binding = 0) uniform image2D renderTexture;
+
+uniform mat4x4 _viewInverse;
+uniform mat4x4 _projectionInverse;
+uniform vec2 _textureResolution;
+uniform int _octreeCount;
+uniform sampler2D _skybox;
+
+struct Octree        // (4 * 16) = 64
+{
+    int parent;      // 4
+    int empty;       // 4
+    int value;       // 4
+    int x;           // 4
+    int y;           // 4
+    int z;           // 4
+    int size;        // 4
+
+    int _000;        // 4
+    int _100;        // 4
+    int _010;        // 4
+    int _110;        // 4
+    int _001;        // 4
+    int _101;        // 4
+    int _011;        // 4
+    int _111;        // 4
+};
+
+struct Material // (4 * 3) = 12
+{
+    float r;
+    float g;
+    float b;
+};
+
+layout(std430, binding=1) buffer ModelLayout
+{
+      Octree[] octreeData;
+};
+
+layout(std430, binding=2) buffer MaterialLayout
+{
+    Material[] materialData;
+};
+
+#define EPSILON 0.001
+#define MAX_STEPS 1000
+
+struct Ray
+{
+    vec3 pos;
+    vec3 dir;
+    vec3 invdir;
+    int sign[3];
+};
+
+Ray CreateRay(vec3 pos, vec3 dir)
+{
+    Ray ray;
+    ray.pos = pos;
+    ray.dir = dir;
+    ray.invdir = 1.0 / dir;
+    
+    if (ray.invdir.x < 0)
+        ray.sign[0] = 1;
+    else
+        ray.sign[0] = 0;
+
+    if (ray.invdir.y < 0)
+        ray.sign[1] = 1;
+    else
+        ray.sign[1] = 0;
+
+    if (ray.invdir.z < 0)
+        ray.sign[2] = 1;
+    else
+        ray.sign[2] = 0;
+
+    return ray;
+}
+
+Ray CreateCameraRay(vec2 uv)
+{
+    // src: http://blog.three-eyed-games.com/2018/05/03/gpu-ray-tracing-in-unity-part-1/
+    vec3 pos = (_viewInverse * vec4(0, 0, 0, 1)).xyz;
+    
+    vec3 dir = (_projectionInverse * vec4(uv, 0, 1)).xyz;
+    dir = (_viewInverse * vec4(dir, 0)).xyz;
+    dir = normalize(dir);
+
+    return CreateRay(pos, dir);
+}
+
+void swap(inout float a, inout float b)
+{
+    float c = a;
+    a = b;
+    b = c;
+}
+
+/*
+vec3 SampleSkyboxFromRay(Ray ray)
+{
+    float phi = atan(ray.dir.x, -ray.dir.z) / -PI * 0.5f;
+    float theta = acos(ray.dir.y) / -PI;
+
+    return texture(_skyboxSampler, vec2(phi, theta)).xyz;
+}
+*/
+
+// src: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
+bool RayBoxIntersect(Octree tree, Ray r, out float tmin, out float tmax) 
+{
+    vec3 bMin = vec3(tree.x, tree.y, tree.z);
+    vec3 bMax = bMin + tree.size;
+
+    vec3[2] bounds = { bMin, bMax };
+    
+    float tymin, tymax, tzmin, tzmax; 
+ 
+    tmin = (bounds[r.sign[0]].x - r.pos.x) * r.invdir.x; 
+    tmax = (bounds[1-r.sign[0]].x - r.pos.x) * r.invdir.x; 
+    tymin = (bounds[r.sign[1]].y - r.pos.y) * r.invdir.y; 
+    tymax = (bounds[1-r.sign[1]].y - r.pos.y) * r.invdir.y; 
+ 
+    if ((tmin > tymax) || (tymin > tmax)) 
+        return false; 
+ 
+    if (tymin > tmin) 
+        tmin = tymin; 
+    if (tymax < tmax) 
+        tmax = tymax; 
+ 
+    tzmin = (bounds[r.sign[2]].z - r.pos.z) * r.invdir.z; 
+    tzmax = (bounds[1-r.sign[2]].z - r.pos.z) * r.invdir.z; 
+ 
+    if ((tmin > tzmax) || (tzmin > tmax)) 
+        return false; 
+ 
+    if (tzmin > tmin) 
+        tmin = tzmin; 
+    if (tzmax < tmax) 
+        tmax = tzmax; 
+ 
+    if (tmax < 0)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool RayInBox(Octree tree, Ray ray)
+{
+    vec3 bMin = vec3(tree.x, tree.y, tree.z);
+    vec3 bMax = bMin + tree.size;
+
+    return (
+        ray.pos.x >= bMin.x && ray.pos.y >= bMin.y && ray.pos.z >= bMin.z &&
+        ray.pos.x < bMax.x && ray.pos.y < bMax.y && ray.pos.z < bMax.z
+    );
+}
+
+int RayOctreeIntersect(inout Ray ray)
+{
+    Octree root = octreeData[0];
+
+    // if the ray's not in the octree, move it in
+    if (!RayInBox(root, ray))
+    {
+        // throw away rays not intersecting with the octree
+        float tmin;
+        float tmax;
+        if (!RayBoxIntersect(root, ray, tmin, tmax))
+        {
+            return -1;
+        }
+
+        // move the ray to the box if it's far away
+        ray.pos += ray.dir * (tmin + EPSILON);
+    }
+
+    // start traversing down the octree and moving forward the ray
+    int currentID = 0;
+    int i;
+    bool t = false;
+    for(i = 0; i < MAX_STEPS; i ++)
+    {
+        // if this node is a leaf, exit
+        Octree currentTree = octreeData[currentID];
+        if (currentTree.value != -1)
+        {
+            return currentID;
+        }
+
+        // if this node has no children, march the ray and return to parent
+        if (currentTree.empty == 1)
+        {
+            float tmin;
+            float tmax;
+            RayBoxIntersect(currentTree, ray, tmin, tmax);
+
+            ray.pos += ray.dir * (tmax + EPSILON);
+
+            currentID = currentTree.parent;
+            continue;
+        }
+
+        if (!RayInBox(currentTree, ray))
+        {
+            // special case - if the ray is no longer inside the root box, stop marching
+            if (currentID == 0)
+            {
+                return -1;
+            }
+
+            currentID = currentTree.parent;
+            continue;
+        }
+
+        // this node has children, so find the next child node to look at
+
+        // get the currentTree's child the ray is currently in
+        vec3 normalizedPos = (ray.pos - vec3(currentTree.x, currentTree.y, currentTree.z)) / currentTree.size;
+        normalizedPos = floor(normalizedPos + 0.5);
+
+        // index from 3d pos
+        int index = 0;
+        index += 4 * int(normalizedPos.z);
+        index += 2 * int(normalizedPos.y);
+        index += 1 * int(normalizedPos.x);
+
+        // switch to the new tree
+        if (index == 0)
+            currentID = currentTree._000;
+        else if (index == 1)
+            currentID = currentTree._100;
+        else if (index == 2)
+            currentID = currentTree._010;
+        else if (index == 3)
+            currentID = currentTree._110;
+        else if (index == 4)
+            currentID = currentTree._001;
+        else if (index == 5)
+            currentID = currentTree._101;
+        else if (index == 6)
+            currentID = currentTree._011;
+        else if (index == 7)
+            currentID = currentTree._111;
+    }
+    return -1;
+}
+
+void main (void)
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    // generate the camera ray
+    vec2 uv = (vec2(texelCoord) / _textureResolution.xy) * 2.0 - 1;
+    Ray cameraRay = CreateCameraRay(uv);
+     
+    // find the voxel intersected by the ray & store it
+    int treeID = RayOctreeIntersect(cameraRay);
+
+    vec3 colour = vec3(1, 0, 1);
+    if (treeID == -1)
+    {
+        // no voxel was hit
+        colour = vec3(0.6, 0.65, 0.95);
+    }
+    else
+    {
+        Material mat = materialData[octreeData[treeID].value];
+        colour = vec3(mat.r, mat.g, mat.b);
+    }
+
+    imageStore(renderTexture, texelCoord, vec4(colour, 1));
+}

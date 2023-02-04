@@ -1,6 +1,7 @@
 ﻿using Nubila;
 using GLFW;
 using OpenGL.Core;
+using System.Numerics;
 
 class Game : Engine
 {
@@ -20,8 +21,8 @@ class Game : Engine
 
     protected override void Awake()
     {
-        windowWidth = 800;
-        windowHeight = 600;
+        windowWidth = 1920;
+        windowHeight = 1080;
     }
 
     protected override void Start()
@@ -41,7 +42,7 @@ class Game : Engine
         camera.SetDirection(direction);
 
         skybox = new Texture2D("res/Textures/skybox-1920.png");
-        model = new Model("res/Models/monu2.ply");
+        model = new Model("res/Models/monu1.ply");
         model.GenerateModelData();
         model.GenerateMaterialData();
 

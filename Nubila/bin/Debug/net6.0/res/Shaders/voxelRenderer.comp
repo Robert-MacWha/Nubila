@@ -48,6 +48,8 @@ layout(std430, binding=2) buffer MaterialLayout
 
 #define EPSILON 0.001
 #define MAX_STEPS 1000
+#define SUN_DIR vec3(-0.440225, 0.880451, 0.17609)
+#define SPOTLIGHT_DIR vec3(0.0890871, 0.890871, -0.445435);
 
 struct Ray
 {
@@ -221,7 +223,7 @@ int RayOctreeIntersect(inout Ray ray)
             continue;
         }
 
-        // this node has children, so find the next child node to look at
+        //* this node has children, so find the next child node to look at
 
         // get the currentTree's child the ray is currently in
         vec3 normalizedPos = (ray.pos - vec3(currentTree.x, currentTree.y, currentTree.z)) / currentTree.size;
@@ -275,6 +277,25 @@ void main (void)
     {
         Material mat = materialData[octreeData[treeID].value];
         colour = vec3(mat.r, mat.g, mat.b);
+
+        // check if the ray is in shadow
+        vec3 pos = cameraRay.pos - cameraRay.dir * EPSILON * 2;
+        vec3 dirSun = SUN_DIR;
+        vec3 dirSpolight = SPOTLIGHT_DIR;
+        Ray shadowRay = CreateRay(pos, dirSun);
+        Ray shadowRay2 = CreateRay(pos, dirSpolight);
+        
+        int shadowTreeID = RayOctreeIntersect(shadowRay);
+        bool inSunShadow = shadowTreeID != -1;
+
+        shadowTreeID = RayOctreeIntersect(shadowRay2);
+        bool inSpotlightShadow = shadowTreeID != -1;
+
+        if (inSunShadow)
+            colour *= vec3(0.9, 0.9, 0.92);
+
+        if (inSpotlightShadow)
+            colour *= vec3(1, 0.95, 0.95);
     }
 
     imageStore(renderTexture, texelCoord, vec4(colour, 1));

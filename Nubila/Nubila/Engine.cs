@@ -16,7 +16,7 @@ namespace Nubila
         public void Run()
         {
             Awake();
-            DisplayManager.CreateWindow(windowWidth, windowHeight, windowTitle, 1);
+            DisplayManager.CreateWindow(windowWidth, windowHeight, windowTitle, 0);
             Input.Initialize();
             Start();
 

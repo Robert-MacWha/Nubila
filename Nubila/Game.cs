@@ -1,10 +1,6 @@
 ﻿using Nubila;
 using GLFW;
 using OpenGL.Core;
-using System.Numerics;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System;
 
 class Game : Engine
 {
@@ -13,7 +9,6 @@ class Game : Engine
 
     Camera camera;
     Texture2D skybox;
-    Texture2D voxelRenderTarget;
     RenderTexture2D renderTexture;
     ComputeShader computeShader;
     ShaderProgram renderShader;
@@ -33,7 +28,6 @@ class Game : Engine
     {
         renderShader = new ShaderProgram(new string[] { "res/Shaders/test.vert", "res/Shaders/test.frag" });
 
-        voxelRenderTarget = new Texture2D(windowWidth, windowHeight, glInternalFormat.R32F);
         renderTexture = new RenderTexture2D(new Texture2D(windowWidth, windowHeight, glInternalFormat.RGBA32F), -1, -1, 2, 2);
 
         camera = new Camera(45, DisplayManager.aspectRatio);
@@ -49,8 +43,9 @@ class Game : Engine
         skybox = new Texture2D("res/Textures/skybox-1920.png");
         model = new Model("res/Models/monu2.ply");
         model.GenerateModelData();
+        model.GenerateMaterialData();
 
-        computeShader = new ComputeShader("res/Shaders/pixelVoxelMap.comp");
+        computeShader = new ComputeShader("res/Shaders/voxelRenderer.comp");
         computeShader.SetInt("_modelSampler", 1);
         computeShader.SetInt("_octreeCount", model.OctreeDataLength());
         computeShader.SetVec2("_textureResolution", new Vector2(windowWidth, windowHeight));
@@ -62,17 +57,17 @@ class Game : Engine
     {
         // render which voxel coresponds to each pixel
         computeShader.Use();
-        voxelRenderTarget.BindImage(0);
+        renderTexture.GetTexture().BindImage(0);
         model.BindModelBuffer(1);
+        model.BindMaterialBuffer(2);
 
         computeShader.SetMatrix4x4("_viewInverse", camera.m_viewMatrix.Invert());
         computeShader.SetMatrix4x4("_projectionInverse", camera.m_projectionMatrix.Invert());
         computeShader.Dispatch((uint)Math.Ceiling(windowWidth / 32.0), (uint)Math.Ceiling(windowHeight / 16.0), 1);
 
-        // set the colour of each pixel to the coresponding voxel colour
-
         // render the output texture
         renderShader.Use();
+        renderTexture.Render();
     }
 
     protected override void Update()

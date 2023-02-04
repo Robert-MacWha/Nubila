@@ -22,8 +22,6 @@ namespace Nubila
             _101 = -1;
             _011 = -1;
             _111 = -1;
-
-            _toRender = 0;
         }
 
         public int m_parent;
@@ -43,7 +41,6 @@ namespace Nubila
         public int _101;
         public int _011;
         public int _111;
-        public int _toRender;
     }
 
     internal class Octree

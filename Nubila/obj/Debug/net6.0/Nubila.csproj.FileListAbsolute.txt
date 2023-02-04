@@ -25,7 +25,6 @@ D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\test.frag
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\test.vert
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\test.jpg
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\test-small.jpg
-D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\render.comp
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\test.txt
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\skybox.jpg
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Textures\skybox-1920.png
@@ -35,3 +34,4 @@ D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\octree.ply
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\cars.ply
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\monu1.ply
 D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Models\monu2.ply
+D:\Github\Nubila\Nubila\bin\Debug\net6.0\res\Shaders\voxelRenderer.comp

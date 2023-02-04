@@ -1,12 +1,13 @@
 ﻿#version 430 core
 layout(local_size_x = 32, local_size_y = 16, local_size_z = 1) in;
 
-// layout(r32f, binding = 0) uniform image2D renderTexture;
+layout(rgba32f, binding = 0) uniform image2D renderTexture;
 
 uniform mat4x4 _viewInverse;
 uniform mat4x4 _projectionInverse;
 uniform vec2 _textureResolution;
 uniform int _octreeCount;
+uniform sampler2D _skybox;
 
 struct Octree        // (4 * 16) = 64
 {
@@ -26,7 +27,13 @@ struct Octree        // (4 * 16) = 64
     int _101;        // 4
     int _011;        // 4
     int _111;        // 4
-    int _toRender;   // 4
+};
+
+struct Material // (4 * 3) = 12
+{
+    float r;
+    float g;
+    float b;
 };
 
 layout(std430, binding=1) buffer ModelLayout
@@ -34,7 +41,11 @@ layout(std430, binding=1) buffer ModelLayout
       Octree[] octreeData;
 };
 
-#define PI 3.14159265
+layout(std430, binding=2) buffer MaterialLayout
+{
+    Material[] materialData;
+};
+
 #define EPSILON 0.001
 #define MAX_STEPS 1000
 
@@ -253,5 +264,18 @@ void main (void)
      
     // find the voxel intersected by the ray & store it
     int treeID = RayOctreeIntersect(cameraRay);
-    octreeData[treeID]._toRender = 1;
+
+    vec3 colour = vec3(1, 0, 1);
+    if (treeID == -1)
+    {
+        // no voxel was hit
+        colour = vec3(0.6, 0.65, 0.95);
+    }
+    else
+    {
+        Material mat = materialData[octreeData[treeID].value];
+        colour = vec3(mat.r, mat.g, mat.b);
+    }
+
+    imageStore(renderTexture, texelCoord, vec4(colour, 1));
 }

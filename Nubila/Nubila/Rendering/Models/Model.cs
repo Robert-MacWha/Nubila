@@ -23,9 +23,10 @@ namespace Nubila
         public int m_depth;
 
         // https://www.khronos.org/opengl/wiki/Shader_Storage_Buffer_Object
-        private uint m_ssboID;
+        private uint m_modelSsboID;
+        private uint m_materialSsboID;
 
-        private OctreeStruct[] octreeData;
+        private OctreeStruct[] m_octreeData;
 
         /// <summary>
         /// Load a model from a .ply point file (exported via Magica Voxel)
@@ -33,7 +34,8 @@ namespace Nubila
         /// <param name="file"></param>
         public Model(string file)
         {
-            m_ssboID = gl.GenBuffer();
+            m_modelSsboID = gl.GenBuffer();
+            m_materialSsboID = gl.GenBuffer();
             m_file = file;
 
             // load the file from disk
@@ -94,21 +96,46 @@ namespace Nubila
             // prepare the data
             List<OctreeStruct> octreeList = m_octree.Flatten();
 
-            octreeData = octreeList.ToArray();
-
-            int octreeDataSize = octreeData.Length * (4 * 16);
+            m_octreeData = octreeList.ToArray();
+            int octreeDataSize = m_octreeData.Length * (4 * 15);
 
             // prepare the buffer
             // TODO: Find a way to avoid using unsafe here (byte[] instead of struct[]?)
             unsafe
             {
                 // src: https://www.reddit.com/r/csharp/comments/2ttp34/how_to_create_a_intptr_for_a_struct_array/
-                var handle = GCHandle.Alloc(octreeData, GCHandleType.Pinned);
+                var handle = GCHandle.Alloc(m_octreeData, GCHandleType.Pinned);
                 try
                 {
-                    gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, m_ssboID);
+                    gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, m_modelSsboID);
                     gl.BufferData(glBufferTarget.SHADER_STORAGE_BUFFER, octreeDataSize, handle.AddrOfPinnedObject(), glBufferUsage.DYNAMIC_DRAW);
-                    gl.BindBufferBase(glBufferTarget.SHADER_STORAGE_BUFFER, 3, m_ssboID);
+                    gl.BindBufferBase(glBufferTarget.SHADER_STORAGE_BUFFER, 3, m_modelSsboID);
+                    gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, 0); // unbind
+                }
+                finally
+                {
+                    handle.Free();
+                }
+            }
+        }
+
+        public void GenerateMaterialData()
+        {
+            // prepare the data
+            Material[] materialData = m_materials.ToArray();
+            int materialDataSize = materialData.Length * (4 * 3);
+
+            // prepare the buffer
+            // TODO: Find a way to avoid using unsafe here (byte[] instead of struct[]?)
+            unsafe
+            {
+                // src: https://www.reddit.com/r/csharp/comments/2ttp34/how_to_create_a_intptr_for_a_struct_array/
+                var handle = GCHandle.Alloc(materialData, GCHandleType.Pinned);
+                try
+                {
+                    gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, m_materialSsboID);
+                    gl.BufferData(glBufferTarget.SHADER_STORAGE_BUFFER, materialDataSize, handle.AddrOfPinnedObject(), glBufferUsage.DYNAMIC_DRAW);
+                    gl.BindBufferBase(glBufferTarget.SHADER_STORAGE_BUFFER, 3, m_materialSsboID);
                     gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, 0); // unbind
                 }
                 finally
@@ -120,8 +147,14 @@ namespace Nubila
 
         public void BindModelBuffer(uint binding)
         {
-            gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, m_ssboID);
-            gl.BindBufferBase(glBufferTarget.SHADER_STORAGE_BUFFER, binding, m_ssboID);
+            // gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, m_modelSsboID);
+            gl.BindBufferBase(glBufferTarget.SHADER_STORAGE_BUFFER, binding, m_modelSsboID);
+        }
+
+        public void BindMaterialBuffer(uint binding)
+        {
+            // gl.BindBuffer(glBufferTarget.SHADER_STORAGE_BUFFER, m_materialSsboID);
+            gl.BindBufferBase(glBufferTarget.SHADER_STORAGE_BUFFER, binding, m_materialSsboID);
         }
 
         public void Print()
@@ -131,7 +164,7 @@ namespace Nubila
 
         public int OctreeDataLength()
         {
-            return octreeData.Length;
+            return m_octreeData.Length;
         }
 
         private void RefreshModelOctree()

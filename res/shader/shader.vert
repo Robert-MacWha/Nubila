@@ -4,9 +4,9 @@ out vec4 vertColor;
 
 void main() {
     vec2 positions[3] = vec2[3](
-        vec2(0.0,  0.5),  // Top vertex
-        vec2(-0.5, -0.5),  // Bottom-left vertex
-        vec2(0.5, -0.5)  // Bottom-right vertex
+        vec2(-1.0, -1.0),  // Bottom-left, off-screen
+        vec2( 3.0, -1.0),  // Bottom-right, off-screen
+        vec2(-1.0,  3.0)   // Top-left, off-screen
     );
 
     vec3 colors[3] = vec3[3](

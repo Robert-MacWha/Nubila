@@ -1,10 +1,14 @@
+pub mod engine;
+pub mod game;
+pub mod input;
+pub mod shader;
+pub mod state;
+
 use std::{borrow::Cow, fs};
 
-use wgpu::{ShaderModule, ShaderModuleDescriptor, ShaderStages};
 use winit::{
-    dpi,
     event::{ElementState, Event, KeyEvent, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowBuilder},
 };

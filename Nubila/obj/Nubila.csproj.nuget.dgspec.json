@@ -1,24 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Github\\Nubila\\Nubila\\Nubila.csproj": {}
+    "E:\\Github\\Nubila\\Nubila\\Nubila.csproj": {}
   },
   "projects": {
-    "D:\\Github\\Nubila\\Nubila\\Nubila.csproj": {
+    "E:\\Github\\Nubila\\Nubila\\Nubila.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Github\\Nubila\\Nubila\\Nubila.csproj",
+        "projectUniqueName": "E:\\Github\\Nubila\\Nubila\\Nubila.csproj",
         "projectName": "Nubila",
-        "projectPath": "D:\\Github\\Nubila\\Nubila\\Nubila.csproj",
+        "projectPath": "E:\\Github\\Nubila\\Nubila\\Nubila.csproj",
         "packagesPath": "C:\\Users\\trebo\\.nuget\\packages\\",
-        "outputPath": "D:\\Github\\Nubila\\Nubila\\obj\\",
+        "outputPath": "E:\\Github\\Nubila\\Nubila\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
           "C:\\Users\\trebo\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -38,12 +34,21 @@
           "warnAsError": [
             "NU1605"
           ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
         }
       },
       "frameworks": {
         "net6.0": {
           "targetAlias": "net6.0",
           "dependencies": {
+            "OpenTK": {
+              "target": "Package",
+              "version": "[4.8.2, )"
+            },
             "System.Drawing.Common": {
               "target": "Package",
               "version": "[6.0.0, )"
@@ -60,12 +65,30 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[6.0.32, 6.0.32]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[6.0.32, 6.0.32]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[6.0.32, 6.0.32]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[6.0.32, 6.0.32]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.102\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.303\\RuntimeIdentifierGraph.json"
         }
       }
     }

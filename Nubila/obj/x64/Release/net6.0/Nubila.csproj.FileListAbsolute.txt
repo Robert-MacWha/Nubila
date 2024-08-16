@@ -1,0 +1,8 @@
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.csproj.AssemblyReference.cache
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.Nubila.lib.GLFW.Strings.resources
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.csproj.GenerateResource.cache
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.GeneratedMSBuildEditorConfig.editorconfig
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.AssemblyInfoInputs.cache
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.AssemblyInfo.cs
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.csproj.CoreCompileInputs.cache
+E:\Github\Nubila\Nubila\obj\x64\Release\net6.0\Nubila.sourcelink.json

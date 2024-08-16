@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Nubila")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9adf0b16a26856596dafc20174608b33040c6046")]
 [assembly: System.Reflection.AssemblyProductAttribute("Nubila")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Nubila")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

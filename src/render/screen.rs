@@ -1,6 +1,5 @@
-use std::default;
 
-use glium::{backend::Facade, index::NoIndices, Frame, Surface};
+use glium::{backend::Facade, Frame, Surface};
 
 use super::{shader, vertex::Vertex};
 

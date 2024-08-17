@@ -1,6 +1,6 @@
 use std::fs;
 
-use glium::{backend::Facade, glutin::display::Display, program::Program};
+use glium::{backend::Facade, program::Program};
 
 pub fn program_from_path<P: AsRef<std::path::Path>, F: ?Sized + Facade>(
     facade: &F,

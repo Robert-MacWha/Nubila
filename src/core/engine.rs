@@ -1,11 +1,8 @@
-use glium::{
-    glutin::api::egl::context,
-    winit::{
-        application::ApplicationHandler,
-        event::{Event, StartCause, WindowEvent},
-        event_loop::{ActiveEventLoop, EventLoop},
-        window::WindowId,
-    },
+use glium::winit::{
+    application::ApplicationHandler,
+    event::{StartCause, WindowEvent},
+    event_loop::{ActiveEventLoop, EventLoop},
+    window::WindowId,
 };
 
 use super::{context::Context, game::Game};
@@ -59,14 +56,12 @@ impl<G: Game> ApplicationHandler for Engine<G> {
         event_loop.set_control_flow(glium::winit::event_loop::ControlFlow::Poll);
     }
 
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        println!("Resumed");
-    }
+    fn resumed(&mut self, _event_loop: &ActiveEventLoop) {}
 
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        window_id: WindowId,
+        _window_id: WindowId,
         event: WindowEvent,
     ) {
         match event {

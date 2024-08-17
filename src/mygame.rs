@@ -1,8 +1,8 @@
-use glium::{Frame, Surface};
+use glium::Surface;
 
 use crate::{
     core::{context::Context, game::Game},
-    render::{screen::Screen, shader::program_from_path},
+    render::screen::Screen,
 };
 
 pub struct MyGame {

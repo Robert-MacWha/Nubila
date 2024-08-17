@@ -1,6 +1,6 @@
 use glium::winit::{
     application::ApplicationHandler,
-    event::{StartCause, WindowEvent},
+    event::{ElementState, StartCause, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
     window::WindowId,
 };
@@ -71,13 +71,25 @@ impl<G: Game> ApplicationHandler for Engine<G> {
             WindowEvent::Resized(size) => {
                 self.context.window().resize(size);
             }
-            // WindowEvent::KeyboardInput {
-            //     device_id,
-            //     event,
-            //     is_synthetic,
-            // } => {
-            //     todo!();
-            // }
+            WindowEvent::KeyboardInput {
+                device_id: _,
+                event,
+                is_synthetic: _,
+            } => {
+                if event.repeat {
+                    return;
+                }
+
+                self.game.on_key(&mut self.context, &event.logical_key);
+                match event.state {
+                    ElementState::Pressed => self
+                        .game
+                        .on_key_pressed(&mut self.context, &event.logical_key),
+                    ElementState::Released => self
+                        .game
+                        .on_key_released(&mut self.context, &event.logical_key),
+                }
+            }
             // WindowEvent::MouseInput {
             //     device_id,
             //     state,

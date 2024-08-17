@@ -1,4 +1,7 @@
-use glium::Surface;
+use glium::{
+    winit::keyboard::{self, Key, SmolStr},
+    Surface,
+};
 
 use crate::{
     core::{context::Context, game::Game},
@@ -28,9 +31,7 @@ impl Game for MyGame {
         MyGame { screen }
     }
 
-    fn update(&mut self, ctx: &mut Context) {
-        println!("Game updated");
-    }
+    fn update(&mut self, ctx: &mut Context) {}
 
     fn render(&self, ctx: &mut Context) {
         let mut target = ctx.window().start_draw();
@@ -53,5 +54,14 @@ impl Game for MyGame {
             uniform! {screenSize: screen_size, floatBuffer: &buffer},
         );
         ctx.window().end_draw(target);
+    }
+
+    fn on_key_pressed(&mut self, ctx: &mut Context, key: &Key) {
+        match key {
+            Key::Character(c) if c == "r" => {
+                self.screen.reload(ctx.window().display());
+            }
+            _ => {}
+        }
     }
 }

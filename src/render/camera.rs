@@ -1,7 +1,7 @@
 use cgmath::{perspective, Deg, EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector3};
 
 pub struct Camera {
-    pos: Vector3<f32>,
+    pos: Point3<f32>,
     dir: Vector3<f32>,
     fov: Rad<f32>,
     aspect_ratio: f32,
@@ -18,7 +18,7 @@ impl Camera {
         let proj_matrix = Matrix4::identity();
 
         let mut camera = Self {
-            pos: Vector3::new(0.0, 0.0, 0.0),
+            pos: Point3::new(0.0, 0.0, 0.0),
             dir: Vector3::new(0.0, 0.0, 1.0),
             fov: Rad::from(fov),
             aspect_ratio,
@@ -31,7 +31,7 @@ impl Camera {
         return camera;
     }
 
-    pub fn position(&self) -> Vector3<f32> {
+    pub fn position(&self) -> Point3<f32> {
         return self.pos;
     }
 
@@ -47,7 +47,7 @@ impl Camera {
         return self.proj_matrix;
     }
 
-    pub fn set_position(&mut self, pos: Vector3<f32>) {
+    pub fn set_position(&mut self, pos: Point3<f32>) {
         self.pos = pos;
         self.refresh_matrix();
     }
@@ -69,7 +69,6 @@ impl Camera {
 
     fn refresh_matrix(&mut self) {
         self.proj_matrix = perspective(self.fov, self.aspect_ratio, 0.01, 1000.0);
-        self.view_matrix =
-            Matrix4::look_at_rh(Point3::from_vec(self.pos), Point3::from_vec(self.dir), UP);
+        self.view_matrix = Matrix4::look_at_rh(self.pos, Point3::from_vec(self.dir), UP);
     }
 }

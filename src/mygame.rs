@@ -42,7 +42,7 @@ impl Game for MyGame {
         self.i += 1;
 
         let cam_y = (self.i as f32 / 200.0).sin() * 0.5;
-        let pos = cgmath::Vector3::new(0.0, cam_y, 0.0);
+        let pos = cgmath::Point3::new(0.0, cam_y, 0.0);
 
         self.camera.set_position(pos)
     }

@@ -43,6 +43,10 @@ impl Window {
         return self.size;
     }
 
+    pub fn aspect_ratio(&self) -> f64 {
+        return self.size.width as f64 / self.size.height as f64;
+    }
+
     pub fn start_draw(&mut self) -> Frame {
         return self.display.draw();
     }

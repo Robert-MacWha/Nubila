@@ -1,15 +1,16 @@
-use glium::{
-    winit::keyboard::{self, Key, SmolStr},
-    Surface,
-};
+use cgmath::{Deg, SquareMatrix};
+use glium::{winit::keyboard::Key, Surface};
 
 use crate::{
     core::{context::Context, game::Game},
-    render::screen::Screen,
+    render::{camera::Camera, screen::Screen},
 };
 
 pub struct MyGame {
+    camera: Camera,
     screen: Screen,
+
+    i: u32,
 }
 
 #[derive(Copy, Clone)]
@@ -28,10 +29,23 @@ impl Game for MyGame {
             None,
         );
 
-        MyGame { screen }
+        let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
+
+        MyGame {
+            screen,
+            camera,
+            i: 0,
+        }
     }
 
-    fn update(&mut self, ctx: &mut Context) {}
+    fn update(&mut self, ctx: &mut Context) {
+        self.i += 1;
+
+        let cam_y = (self.i as f32 / 200.0).sin() * 0.5;
+        let pos = cgmath::Vector3::new(0.0, cam_y, 0.0);
+
+        self.camera.set_position(pos)
+    }
 
     fn render(&self, ctx: &mut Context) {
         let mut target = ctx.window().start_draw();
@@ -42,17 +56,11 @@ impl Game for MyGame {
             ctx.window().size().height as i32,
         );
 
-        let float_data = FloatBuffer {
-            data: [0.5, 0.1, 0.0, 0.0, 0.0, 0.0],
-        };
+        let view_inverse: [[f32; 4]; 4] = self.camera.view_matrix().invert().unwrap().into();
+        let proj_inverse: [[f32; 4]; 4] = self.camera.proj_matrix().invert().unwrap().into();
+        let uniforms = uniform! {screen_size: screen_size, view_inverse: view_inverse, proj_inverse: proj_inverse};
 
-        let buffer =
-            glium::uniforms::UniformBuffer::new(ctx.window().display(), float_data).unwrap();
-
-        self.screen.draw(
-            &mut target,
-            uniform! {screenSize: screen_size, floatBuffer: &buffer},
-        );
+        self.screen.draw(&mut target, uniforms);
         ctx.window().end_draw(target);
     }
 
@@ -63,5 +71,10 @@ impl Game for MyGame {
             }
             _ => {}
         }
+    }
+
+    fn on_resize(&mut self, ctx: &mut Context) {
+        self.camera
+            .set_aspect_ratio(ctx.window().aspect_ratio() as f32)
     }
 }

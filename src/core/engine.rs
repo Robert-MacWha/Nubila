@@ -70,6 +70,7 @@ impl<G: Game> ApplicationHandler for Engine<G> {
             }
             WindowEvent::Resized(size) => {
                 self.context.window().resize(size);
+                self.game.on_resize(&mut self.context);
             }
             WindowEvent::KeyboardInput {
                 device_id: _,

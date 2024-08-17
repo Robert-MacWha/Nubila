@@ -11,4 +11,6 @@ pub trait Game: Sized {
     fn on_key(&mut self, _: &mut Context, _: &Key) {}
     fn on_key_pressed(&mut self, _: &mut Context, _: &Key) {}
     fn on_key_released(&mut self, _: &mut Context, _: &Key) {}
+
+    fn on_resize(&mut self, _: &mut Context) {}
 }

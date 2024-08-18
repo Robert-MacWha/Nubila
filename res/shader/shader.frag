@@ -1,6 +1,7 @@
 #version 450
 
 #define INFINITY 1e10
+#define MAX_NODES 1024
 
 layout(location = 0) out vec4 outColor;
 
@@ -33,7 +34,7 @@ struct Node {
 };
 
 layout(std430) buffer Nodes {
-    Node nodes[];
+    Node nodes[MAX_NODES];
 };
 
 struct Ray {
@@ -96,7 +97,7 @@ bool intersection(Box box, Ray ray) {
 
 void hit(inout Ray ray) {
     if (intersection(CreateBox(vec3(0, 0, 1), 0.1), ray)) {
-        ray.color = vec3(1, 0, 0);
+        ray.color = vec3(nodes[0].material, 0, 0);
         return;
     }
 
@@ -104,9 +105,11 @@ void hit(inout Ray ray) {
 }
 
 void main() {
-    Ray ray = CreateCameraRay();
+    // Ray ray = CreateCameraRay();
 
-    hit(ray);
+    // hit(ray);
 
-    outColor = vec4(ray.color, 1.0);
+    // outColor = vec4(ray.color, 1.0);
+
+    outColor = vec4(nodes[0].child_start, nodes[0].material, 0, 1);
 }

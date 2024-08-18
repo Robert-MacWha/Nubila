@@ -1,9 +1,12 @@
 use cgmath::{Deg, SquareMatrix};
-use glium::{winit::keyboard::Key, Surface};
+use glium::{buffer::Buffer, winit::keyboard::Key, Surface};
 
 use crate::{
     core::{context::Context, game::Game},
-    model::model::Model,
+    model::{
+        model::Model,
+        octree::{self, Node, Octree},
+    },
     render::{camera::Camera, screen::Screen},
 };
 
@@ -11,16 +14,10 @@ pub struct MyGame {
     camera: Camera,
     screen: Screen,
     model: Model,
+    model_buffer: Buffer<[octree::Node]>,
 
     i: u32,
 }
-
-#[derive(Copy, Clone)]
-struct FloatBuffer {
-    data: [f32; 6],
-}
-
-implement_uniform_block!(FloatBuffer, data);
 
 impl Game for MyGame {
     fn new(ctx: &mut Context) -> Self {
@@ -34,12 +31,21 @@ impl Game for MyGame {
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
         let model = Model::new("res/model/3x3x3.ply");
+        let octree = Octree::new(&model).serialize();
+        let model_buffer = Buffer::new(
+            ctx.window().display(),
+            octree.as_slice(),
+            glium::buffer::BufferType::UniformBuffer,
+            glium::buffer::BufferMode::Immutable,
+        )
+        .unwrap();
 
         MyGame {
             screen,
             camera,
             i: 0,
             model,
+            model_buffer,
         }
     }
 
@@ -63,7 +69,13 @@ impl Game for MyGame {
 
         let view_inverse: [[f32; 4]; 4] = self.camera.view_matrix().invert().unwrap().into();
         let proj_inverse: [[f32; 4]; 4] = self.camera.proj_matrix().invert().unwrap().into();
-        let uniforms = uniform! {screen_size: screen_size, view_inverse: view_inverse, proj_inverse: proj_inverse};
+
+        let uniforms = uniform! {
+            screen_size: screen_size,
+            view_inverse: view_inverse,
+            proj_inverse: proj_inverse,
+            Nodes: &self.model_buffer,
+        };
 
         self.screen.draw(&mut target, uniforms);
         ctx.window().end_draw(target);

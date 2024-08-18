@@ -2,10 +2,13 @@ use cgmath::{Point3, Vector3};
 
 use super::{model::Model, voxel::Voxel};
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub struct Node {
     child_start: u32,
     material: u32,
 }
+implement_uniform_block!(Node, child_start, material);
 
 pub struct Octree {
     pos: Point3<u32>,
@@ -27,7 +30,7 @@ impl Node {
 }
 
 impl Octree {
-    pub fn new(model: Model) -> Self {
+    pub fn new(model: &Model) -> Self {
         let model_size = model.size();
         let size = model_size.x.max(model_size.y).max(model_size.z);
 

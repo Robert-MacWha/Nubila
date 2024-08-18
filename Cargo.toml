@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 cgmath = "0.18.0"
 glium = "0.35"
+ply-rs = "0.1.3"
+thiserror = "1.0.63"
 
 [[bin]]
 name = "nubila"

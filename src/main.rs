@@ -1,4 +1,5 @@
 mod core;
+mod model;
 mod mygame;
 mod render;
 

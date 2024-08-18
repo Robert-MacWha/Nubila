@@ -1,18 +1,51 @@
 #version 450
 
+#define INFINITY 1e10
+
 layout(location = 0) out vec4 outColor;
 
+// Camera
 uniform ivec2 screen_size;
 uniform mat4x4 view_inverse;
 uniform mat4x4 proj_inverse;
 
-float focal_length = 1;
-float viewport_height = 2;
+// Octree
+uniform vec3 octree_origin;
+uniform float octree_size;
+
+struct Node {
+    // todo: Think about using the first bit as a flag for leaf node. Then you could
+    // store the material in the same uint as the children.
+    // 
+    // 0: leaf node, otherwise internal node. If an internal node, the first child 
+    // is at child_start and the other children are at child_start + 1, child_start + 2, etc.
+    // nodes[0]: x0 y0 z0
+    // nodes[1]: x1 y0 z0
+    // nodes[2]: x0 y1 z0
+    // nodes[3]: x1 y1 z0
+    // nodes[4]: x0 y0 z1
+    // nodes[5]: x1 y0 z1
+    // nodes[6]: x0 y1 z1
+    // nodes[7]: x1 y1 z1
+    uint child_start;
+
+    uint material;
+};
+
+layout(std430) buffer Nodes {
+    Node nodes[];
+};
 
 struct Ray {
     vec3 pos;
     vec3 dir;
+    vec3 dir_inv;
     vec3 color;
+};
+
+struct Box {
+    vec3 min;
+    vec3 max;
 };
 
 Ray CreateRay(vec3 pos, vec3 dir)
@@ -20,6 +53,7 @@ Ray CreateRay(vec3 pos, vec3 dir)
     Ray ray;
     ray.pos = pos;
     ray.dir = dir;
+    ray.dir_inv = 1.0 / ray.dir;
     ray.color = vec3(0, 0, 0);
 
     return ray;
@@ -40,35 +74,33 @@ vec3 at(Ray ray, float t) {
     return ray.pos + t * ray.dir;
 }
 
-bool hit_sphere(vec3 center, float radius, inout Ray ray) {
-    vec3 oc = center - ray.pos;
-    float a = dot(ray.dir, ray.dir);
-    float b = -2 * dot(ray.dir, oc);
-    float c = dot(oc, oc) - radius * radius;
-    float discriminant = b * b - 4 * a * c;
+Box CreateBox(vec3 origin, float size) {
+    return Box (origin - size, origin + size);
+}
 
-    if (discriminant < 0) {
-        return false;
+bool intersection(Box box, Ray ray) {
+    // https://tavianator.com/2022/ray_box_boundary.html
+    float tmin = 0;
+    float tmax = INFINITY;
+
+    for (int d = 0; d < 3; ++d) {
+        float t1 = (box.min[d] - ray.pos[d]) * ray.dir_inv[d];
+        float t2 = (box.max[d] - ray.pos[d]) * ray.dir_inv[d];
+
+        tmin = max(tmin, min(t1, t2));
+        tmax = min(tmax, max(t1, t2));
     }
 
-    float t = (-b - sqrt(discriminant)) / (2 * a);
-    if (t < 0) {
-        return false;
-    }
-
-    vec3 n = normalize(at(ray, t) - vec3(0, 0, -1));
-    ray.color = (n + 1) * 0.5;
-    return true;
+    return tmin < tmax;
 }
 
 void hit(inout Ray ray) {
-    if (hit_sphere(vec3(0, 0, 2), 0.5, ray)) {
+    if (intersection(CreateBox(vec3(0, 0, 1), 0.1), ray)) {
+        ray.color = vec3(1, 0, 0);
         return;
     }
 
-    vec3 unit_dir = normalize(ray.dir);
-    float a = 0.5*(unit_dir.y + 1.0);
-    ray.color = (1.0-a)*vec3(1.0, 1.0, 1.0) + a*vec3(0.5, 0.7, 1.0);
+    ray.color = vec3(ray.dir.y, ray.dir.y, (ray.dir.y + 0.3) * 4);
 }
 
 void main() {

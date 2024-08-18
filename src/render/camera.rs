@@ -69,6 +69,6 @@ impl Camera {
 
     fn refresh_matrix(&mut self) {
         self.proj_matrix = perspective(self.fov, self.aspect_ratio, 0.01, 1000.0);
-        self.view_matrix = Matrix4::look_at_rh(self.pos, Point3::from_vec(self.dir), UP);
+        self.view_matrix = Matrix4::look_to_rh(self.pos, self.dir, UP);
     }
 }

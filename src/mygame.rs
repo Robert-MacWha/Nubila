@@ -3,12 +3,14 @@ use glium::{winit::keyboard::Key, Surface};
 
 use crate::{
     core::{context::Context, game::Game},
+    model::model::Model,
     render::{camera::Camera, screen::Screen},
 };
 
 pub struct MyGame {
     camera: Camera,
     screen: Screen,
+    model: Model,
 
     i: u32,
 }
@@ -31,10 +33,13 @@ impl Game for MyGame {
 
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
+        let model = Model::new("res/model/3x3x3.ply");
+
         MyGame {
             screen,
             camera,
             i: 0,
+            model,
         }
     }
 

@@ -22,7 +22,7 @@ impl<G: Game> Engine<G> {
             .build()
             .expect("event loop");
 
-        let window = Window::new(&event_loop);
+        let window = Window::new(&event_loop, false);
         let mut context = Context::new(window);
         let game = G::new(&mut context);
 
@@ -43,6 +43,7 @@ impl<G: Game> Engine<G> {
     }
 
     pub fn frame(&mut self) {
+        self.context.time().update();
         self.game.update(&mut self.context);
         self.game.render(&mut self.context);
 

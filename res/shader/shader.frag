@@ -15,6 +15,38 @@ uniform mat4x4 proj_inverse;
 uniform vec3 octree_origin = vec3(-0.5, -0.5, -0.5);
 uniform float octree_size = 1;
 
+// Lookup table for the order of children to visit based on the ray direction.
+// Optimized to visit closer children first.
+const uint order_lookup[8][8] = {
+    // +x +y +z
+    {0, 1, 2, 3, 4, 5, 6, 7}, 
+    // -x +y +z
+    {1, 0, 3, 2, 5, 4, 7, 6}, 
+    // +x -y +z
+    {2, 3, 0, 1, 6, 7, 4, 5}, 
+    // -x -y +z
+    {3, 2, 1, 0, 7, 6, 5, 4}, 
+    // +x +y -z
+    {4, 5, 6, 7, 0, 1, 2, 3}, 
+    // -x +y -z
+    {5, 4, 7, 6, 1, 0, 3, 2}, 
+    // +x -y -z
+    {6, 7, 4, 5, 2, 3, 0, 1}, 
+    // -x -y -z
+    {7, 6, 5, 4, 3, 2, 1, 0}  
+};
+
+const vec3 offset_lookup[8] = {
+    vec3(0, 0, 0),
+    vec3(1, 0, 0),
+    vec3(0, 1, 0),
+    vec3(1, 1, 0),
+    vec3(0, 0, 1),
+    vec3(1, 0, 1),
+    vec3(0, 1, 1),
+    vec3(1, 1, 1)
+};
+
 struct Node {
     // todo: Think about using the first bit as a flag for leaf node. Then you could
     // store the material in the same uint as the children.
@@ -31,6 +63,7 @@ struct Node {
     // nodes[7]: x1 y1 z1
     uint child_start;
 
+    // material is packed with the rgb color components.  r<<16 | g<<8 | b
     uint material;
 };
 
@@ -88,20 +121,32 @@ Box CreateBox(vec3 min, float size) {
     return Box (min, min + size);
 }
 
-bool intersection(Box box, Ray ray, out float t) {
+bool intersection(Box box, Ray ray, out float tmin) {
     // https://tavianator.com/2022/ray_box_boundary.html
     float tmax = INFINITY;
-    float tmin = 0;
+    tmin = 0;
 
     for (int d = 0; d < 3; ++d) {
         float t1 = (box.min[d] - ray.pos[d]) * ray.dir_inv[d];
         float t2 = (box.max[d] - ray.pos[d]) * ray.dir_inv[d];
 
-        tmin = max(tmin, min(t1, t2));
-        tmax = min(tmax, max(t1, t2));
+        tmin = min(max(t1, tmin), max(t2, tmin));
+        tmax = max(min(t1, tmax), min(t2, tmax));
     }
 
     return tmin < tmax;
+}
+
+int signbit(float x) {
+    return int(floatBitsToInt(x) >> 31) & 1;
+}
+
+vec3 color_from_material(uint material) {
+    return vec3(
+        (material >> 16) & 0xff,
+        (material >> 8) & 0xff,
+        material & 0xff
+    ) / 255.0;
 }
 
 void hit(inout Ray ray) {
@@ -117,60 +162,71 @@ void hit(inout Ray ray) {
     );
 
     uint i = 0;
+    uint max_stack = 0;
+    uint color_updates = 0;
     while (stack_ptr > 0) {
+        max_stack = max(max_stack, stack_ptr);
         i++;
         if (i > 1000) {
             return;
         }
 
         if (stack_ptr > STACK_DEPTH) {
+            ray.color = vec3(1, 0.5, 1);
             return;
         }
 
         // fetch node from the stack
         CastStack item = stack[--stack_ptr];
-        
         Node node = nodes[item.node_index];
         Box box = CreateBox(item.min, item.size);
 
-        // check if the ray intersects the node
         float tmin;
         if (!intersection(box, ray, tmin)) {
+            // discard missed nodes
             continue;
         }
 
-        if (tmin > ray.near_hit) {
+        if (tmin >= ray.near_hit) {
             continue;
         }
 
-        // if a leaf node, update the color
         if (node.material != 0) {
-            ray.color = vec3(1, 0, 0);
+            // if a leaf node, update the color
+            ray.color = color_from_material(node.material);
             ray.near_hit = tmin;
+            color_updates += 1;
         }
 
-        // if it has no children, continue
         if (node.child_start == 0) {
+            // if it has no children, continue
             continue;
         }
 
-        // push children to the stack
+        // push non-empty children to the stack
+        // int sign_x = signbit(ray.dir.x);
+        // int sign_y = signbit(ray.dir.y);
+        // int sign_z = signbit(ray.dir.z);
+        // int index = sign_x << 2 | sign_y << 1 | sign_z;
+        // const uint order[8] = order_lookup[index];
+
         float child_size = item.size * 0.5;
-        stack[stack_ptr++] = CastStack(node.child_start + 0, item.min + vec3(0, 0, 0) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 1, item.min + vec3(1, 0, 0) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 2, item.min + vec3(0, 1, 0) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 3, item.min + vec3(1, 1, 0) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 4, item.min + vec3(0, 0, 1) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 5, item.min + vec3(1, 0, 1) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 6, item.min + vec3(0, 1, 1) * child_size, child_size);
-        stack[stack_ptr++] = CastStack(node.child_start + 7, item.min + vec3(1, 1, 1) * child_size, child_size);
+        for (uint j = 0; j < 8; j++) {
+            uint i = j;
+            uint child_index = node.child_start + i;
+            Node child_node = nodes[child_index];
+
+            // only push non-empty nodes
+            if (child_node.material == 0 && child_node.child_start == 0) {
+                continue;
+            }
+
+            vec3 offset = offset_lookup[i];
+            stack[stack_ptr++] = CastStack(child_index, item.min + offset * child_size, child_size);
+        }
     }
 
-    if (ray.near_hit < INFINITY) {
-        return;
-    }
-
-    ray.color = vec3(1, 1, 1) * i / 200.0;
+    ray.color = vec3(1, 1, 1) * (float(color_updates) / 2.0);
 }
 
 void main() {

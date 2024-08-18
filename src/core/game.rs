@@ -1,4 +1,4 @@
-use glium::winit::{event::KeyEvent, keyboard::Key};
+use glium::winit::keyboard::Key;
 
 use super::context::Context;
 

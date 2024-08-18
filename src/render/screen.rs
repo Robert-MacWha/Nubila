@@ -1,6 +1,6 @@
-use std::{error::Error, path::PathBuf};
+use std::path::PathBuf;
 
-use glium::{backend::Facade, Frame, Program, ProgramCreationError, Surface};
+use glium::{backend::Facade, Frame, Surface};
 
 use super::{shader, vertex::Vertex};
 

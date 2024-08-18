@@ -1,5 +1,5 @@
 use cgmath::{
-    perspective, Deg, EuclideanSpace, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector3,
+    perspective, Deg, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector3,
 };
 
 pub struct Camera {

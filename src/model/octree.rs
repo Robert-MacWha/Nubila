@@ -35,7 +35,6 @@ impl Octree {
         let size = model_size.x.max(model_size.y).max(model_size.z);
 
         //? Octree sizes must be a power of 2
-        println!("size {}", size);
         let size = size.next_power_of_two();
 
         let mut root = Octree {
@@ -218,7 +217,7 @@ mod tests {
     fn test_octree_split() {
         let mut octree = Octree {
             pos: Point3::new(0, 0, 0),
-            size: 8,
+            size: 2,
             voxel: None,
             children: Vec::new(),
         };
@@ -227,12 +226,12 @@ mod tests {
 
         assert_eq!(octree.children.len(), 8);
         assert_eq!(octree.children[0].pos, Point3::new(0, 0, 0));
-        assert_eq!(octree.children[1].pos, Point3::new(4, 0, 0));
-        assert_eq!(octree.children[2].pos, Point3::new(0, 4, 0));
-        assert_eq!(octree.children[3].pos, Point3::new(4, 4, 0));
-        assert_eq!(octree.children[4].pos, Point3::new(0, 0, 4));
-        assert_eq!(octree.children[5].pos, Point3::new(4, 0, 4));
-        assert_eq!(octree.children[6].pos, Point3::new(0, 4, 4));
-        assert_eq!(octree.children[7].pos, Point3::new(4, 4, 4));
+        assert_eq!(octree.children[1].pos, Point3::new(1, 0, 0));
+        assert_eq!(octree.children[2].pos, Point3::new(0, 1, 0));
+        assert_eq!(octree.children[3].pos, Point3::new(1, 1, 0));
+        assert_eq!(octree.children[4].pos, Point3::new(0, 0, 1));
+        assert_eq!(octree.children[5].pos, Point3::new(1, 0, 1));
+        assert_eq!(octree.children[6].pos, Point3::new(0, 1, 1));
+        assert_eq!(octree.children[7].pos, Point3::new(1, 1, 1));
     }
 }

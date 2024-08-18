@@ -7,7 +7,7 @@ use crate::{
     core::{context::Context, game::Game},
     model::{
         model::Model,
-        octree::{self, Node, Octree},
+        octree::{self, Octree},
     },
     render::{camera::Camera, screen::Screen},
 };
@@ -34,7 +34,10 @@ impl Game for MyGame {
 
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
-        let model = Model::new("res/model/3x3x3.ply");
+        let start = Instant::now();
+        let model = Model::new("res/model/teapot.ply");
+        println!("Loaded model in {:?}", start.elapsed());
+
         let octree = Octree::new(&model).serialize();
 
         let model_buffer = Buffer::new(
@@ -44,6 +47,7 @@ impl Game for MyGame {
             glium::buffer::BufferMode::Immutable,
         )
         .unwrap();
+        println!("model_buffer{:#?}", model_buffer);
 
         MyGame {
             screen,
@@ -69,7 +73,7 @@ impl Game for MyGame {
 
         let cam_x = (self.i as f32 / 200.0).sin() * 3.0;
         let cam_z = (self.i as f32 / 200.0).cos() * 3.0;
-        let pos = cgmath::Point3::new(cam_x, 2.0, cam_z);
+        let pos = cgmath::Point3::new(cam_x, 0.0, cam_z);
 
         self.camera.set_position(pos);
         self.camera.look_at(Point3::new(0.0, 0.0, 0.0));

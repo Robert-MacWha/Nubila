@@ -1,6 +1,6 @@
 use glium::{
     backend::glutin::Display,
-    glutin::surface::WindowSurface,
+    glutin::{config::ConfigTemplateBuilder, surface::WindowSurface},
     winit::{self, dpi::PhysicalSize},
     Frame,
 };

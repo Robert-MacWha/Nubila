@@ -55,53 +55,42 @@ impl Model {
             return Err("missing vertex data".to_string());
         }
 
-        // Extract vertex data
-        let vertex = &ply.payload["vertex"];
-        let mut vmin: Option<Point3<u32>> = None;
+        // find min and max of vertex positions
+        let mut min = Point3::new(i32::MAX, i32::MAX, i32::MAX);
+        let mut max = Point3::new(i32::MIN, i32::MIN, i32::MIN);
 
-        for v in vertex.iter() {
-            let x = prop_to_f32(&v["x"])? as u32;
-            let y = prop_to_f32(&v["y"])? as u32;
-            let z = prop_to_f32(&v["z"])? as u32;
+        for v in ply.payload["vertex"].iter() {
+            let x = prop_to_f32(&v["x"])? as i32;
+            let y = prop_to_f32(&v["y"])? as i32;
+            let z = prop_to_f32(&v["z"])? as i32;
+
+            min.x = min.x.min(x);
+            min.y = min.y.min(y);
+            min.z = min.z.min(z);
+            max.x = max.x.max(x);
+            max.y = max.y.max(y);
+            max.z = max.z.max(z);
+        }
+
+        // Extract vertex data
+        for v in ply.payload["vertex"].iter() {
+            let x = ((prop_to_f32(&v["x"])? as i32) - min.x) as u32;
+            let y = ((prop_to_f32(&v["y"])? as i32) - min.y) as u32;
+            let z = ((prop_to_f32(&v["z"])? as i32) - min.z) as u32;
             let r = prop_to_uchar(&v["red"])?;
             let g = prop_to_uchar(&v["green"])?;
             let b = prop_to_uchar(&v["blue"])?;
-
-            match &vmin {
-                Some(min) => {
-                    let x = x.min(min.x);
-                    let y = y.min(min.y);
-                    let z = z.min(min.z);
-                    vmin = Some(Point3::new(x, y, z));
-                }
-                None => {
-                    vmin = Some(Point3::new(x, y, z));
-                }
-            }
 
             // TODO: Assign material correctly
             let voxel = Voxel::new(Point3::new(x, y, z), 1);
             self.voxels.push(voxel);
         }
 
-        // Normalize voxel positions
-        let vmin = vmin.unwrap();
-        let mut vmax = Point3::new(0, 0, 0);
-
-        for voxel in self.voxels.iter_mut() {
-            let pos = voxel.position();
-            let x = pos.x - vmin.x;
-            let y = pos.y - vmin.y;
-            let z = pos.z - vmin.z;
-
-            vmax.x = vmax.x.max(x);
-            vmax.y = vmax.y.max(y);
-            vmax.z = vmax.z.max(z);
-
-            voxel.set_position(Point3::new(x, y, z));
-        }
-
-        self.size = Vector3::new(vmax.x + 1, vmax.y + 1, vmax.z + 1);
+        self.size = Vector3::new(
+            (max.x - min.x + 1) as u32,
+            (max.y - min.y + 1) as u32,
+            (max.z - min.z + 1) as u32,
+        );
 
         Ok(())
     }

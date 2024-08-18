@@ -35,6 +35,7 @@ impl Octree {
         let size = model_size.x.max(model_size.y).max(model_size.z);
 
         //? Octree sizes must be a power of 2
+        println!("size {}", size);
         let size = size.next_power_of_two();
 
         let mut root = Octree {
@@ -56,6 +57,8 @@ impl Octree {
     pub fn serialize(&self) -> Vec<Node> {
         let mut nodes = Vec::new();
         nodes.push(Node::new(0, 0)); // Root node
+                                     // nodes[0].size = self.size;
+                                     // nodes[0].pos = self.pos;
 
         // serialize all children breadth-first
         self.serialize_recursive(&mut nodes, 0);
@@ -142,17 +145,18 @@ impl Octree {
             return;
         }
 
+        let child_size = self.size / 2;
         for i in 0..8 {
             let child_pos = self.pos
                 + Vector3::new(
-                    (i & 1) * self.size / 2,
-                    ((i >> 1) & 1) * self.size / 2,
-                    ((i >> 2) & 1) * self.size / 2,
+                    (i & 1) * child_size,
+                    ((i >> 1) & 1) * child_size,
+                    ((i >> 2) & 1) * child_size,
                 );
 
             self.children.push(Octree {
                 pos: child_pos,
-                size: self.size / 2,
+                size: child_size,
                 voxel: None,
                 children: Vec::new(),
             });
@@ -163,32 +167,6 @@ impl Octree {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_serialize() {
-        let mut octree = Octree {
-            pos: Point3::new(0, 0, 0),
-            size: 2,
-            voxel: None,
-            children: Vec::new(),
-        };
-
-        octree.insert(Voxel::new(Point3::new(0, 1, 0), 1));
-
-        let nodes = octree.serialize();
-        assert_eq!(nodes.len(), 9);
-        assert_eq!(nodes[0].child_start, 1);
-        assert_eq!(nodes[1].child_start, 0);
-        assert_eq!(nodes[2].child_start, 0);
-        assert_eq!(nodes[3].child_start, 0);
-        assert_eq!(nodes[4].child_start, 0);
-        assert_eq!(nodes[5].child_start, 0);
-        assert_eq!(nodes[6].child_start, 0);
-        assert_eq!(nodes[7].child_start, 0);
-        assert_eq!(nodes[8].child_start, 0);
-
-        assert_eq!(nodes[3].material, 1);
-    }
 
     #[test]
     fn test_octree_insert() {

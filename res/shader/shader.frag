@@ -2,6 +2,7 @@
 
 #define INFINITY 1e10
 #define MAX_NODES 1024
+#define STACK_DEPTH 512
 
 layout(location = 0) out vec4 outColor;
 
@@ -11,8 +12,8 @@ uniform mat4x4 view_inverse;
 uniform mat4x4 proj_inverse;
 
 // Octree
-uniform vec3 octree_origin;
-uniform float octree_size;
+uniform vec3 octree_origin = vec3(-0.5, -0.5, -0.5);
+uniform float octree_size = 1;
 
 struct Node {
     // todo: Think about using the first bit as a flag for leaf node. Then you could
@@ -42,6 +43,13 @@ struct Ray {
     vec3 dir;
     vec3 dir_inv;
     vec3 color;
+    float near_hit;
+};
+
+struct CastStack {
+    uint node_index;
+    vec3 min;
+    float size;
 };
 
 struct Box {
@@ -56,6 +64,7 @@ Ray CreateRay(vec3 pos, vec3 dir)
     ray.dir = dir;
     ray.dir_inv = 1.0 / ray.dir;
     ray.color = vec3(0, 0, 0);
+    ray.near_hit = INFINITY;
 
     return ray;
 }
@@ -75,14 +84,14 @@ vec3 at(Ray ray, float t) {
     return ray.pos + t * ray.dir;
 }
 
-Box CreateBox(vec3 origin, float size) {
-    return Box (origin - size, origin + size);
+Box CreateBox(vec3 min, float size) {
+    return Box (min, min + size);
 }
 
-bool intersection(Box box, Ray ray) {
+bool intersection(Box box, Ray ray, out float t) {
     // https://tavianator.com/2022/ray_box_boundary.html
-    float tmin = 0;
     float tmax = INFINITY;
+    float tmin = 0;
 
     for (int d = 0; d < 3; ++d) {
         float t1 = (box.min[d] - ray.pos[d]) * ray.dir_inv[d];
@@ -96,20 +105,78 @@ bool intersection(Box box, Ray ray) {
 }
 
 void hit(inout Ray ray) {
-    if (intersection(CreateBox(vec3(0, 0, 1), 0.1), ray)) {
-        ray.color = vec3(nodes[0].material, 0, 0);
+    // stack of nodes to visit
+    uint stack_ptr = 0;
+    CastStack stack[STACK_DEPTH];
+
+    // push the root node
+    stack[stack_ptr++] = CastStack(
+        0, 
+        octree_origin,
+        octree_size
+    );
+
+    uint i = 0;
+    while (stack_ptr > 0) {
+        i++;
+        if (i > 1000) {
+            return;
+        }
+
+        if (stack_ptr > STACK_DEPTH) {
+            return;
+        }
+
+        // fetch node from the stack
+        CastStack item = stack[--stack_ptr];
+        
+        Node node = nodes[item.node_index];
+        Box box = CreateBox(item.min, item.size);
+
+        // check if the ray intersects the node
+        float tmin;
+        if (!intersection(box, ray, tmin)) {
+            continue;
+        }
+
+        if (tmin > ray.near_hit) {
+            continue;
+        }
+
+        // if a leaf node, update the color
+        if (node.material != 0) {
+            ray.color = vec3(1, 0, 0);
+            ray.near_hit = tmin;
+        }
+
+        // if it has no children, continue
+        if (node.child_start == 0) {
+            continue;
+        }
+
+        // push children to the stack
+        float child_size = item.size * 0.5;
+        stack[stack_ptr++] = CastStack(node.child_start + 0, item.min + vec3(0, 0, 0) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 1, item.min + vec3(1, 0, 0) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 2, item.min + vec3(0, 1, 0) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 3, item.min + vec3(1, 1, 0) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 4, item.min + vec3(0, 0, 1) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 5, item.min + vec3(1, 0, 1) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 6, item.min + vec3(0, 1, 1) * child_size, child_size);
+        stack[stack_ptr++] = CastStack(node.child_start + 7, item.min + vec3(1, 1, 1) * child_size, child_size);
+    }
+
+    if (ray.near_hit < INFINITY) {
         return;
     }
 
-    ray.color = vec3(ray.dir.y, ray.dir.y, (ray.dir.y + 0.3) * 4);
+    ray.color = vec3(1, 1, 1) * i / 200.0;
 }
 
 void main() {
-    // Ray ray = CreateCameraRay();
+    Ray ray = CreateCameraRay();
 
-    // hit(ray);
+    hit(ray);
 
-    // outColor = vec4(ray.color, 1.0);
-
-    outColor = vec4(nodes[0].child_start, nodes[0].material, 0, 1);
+    outColor = vec4(ray.color, 1.0);
 }

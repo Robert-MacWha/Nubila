@@ -1,6 +1,6 @@
 use cgmath::Point3;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct Voxel {
     position: Point3<u32>,
     material: u32,
@@ -18,6 +18,7 @@ impl Voxel {
     pub fn set_position(&mut self, pos: Point3<u32>) {
         self.position = pos;
     }
+
     pub fn material(&self) -> u32 {
         self.material
     }

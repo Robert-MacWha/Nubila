@@ -4,7 +4,6 @@ use std::{
 };
 
 use cgmath::{Point3, Vector3};
-use glium::vertex;
 
 use super::voxel::Voxel;
 
@@ -18,9 +17,9 @@ struct PlyVoxel {
     x: i32,
     y: i32,
     z: i32,
-    r: u32,
-    g: u32,
-    b: u32,
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
 impl Model {
@@ -127,9 +126,7 @@ impl Model {
             let y = (vertex.y - min.y) as u32;
             let z = (vertex.z - min.z) as u32;
 
-            let mat = (vertex.r << 16) | (vertex.g << 8) | vertex.b;
-
-            let voxel = Voxel::new(Point3::new(x, y, z), mat);
+            let voxel = Voxel::new(Point3::new(x, y, z), vertex.r, vertex.g, vertex.b);
             self.voxels.push(voxel);
         }
         println!("Converted to model in {:?}", start.elapsed());
@@ -167,17 +164,17 @@ impl PlyVoxel {
         let r = parts
             .next()
             .ok_or("missing r")?
-            .parse::<u32>()
+            .parse::<u8>()
             .unwrap_or_default();
         let g = parts
             .next()
             .ok_or("missing g")?
-            .parse::<u32>()
+            .parse::<u8>()
             .unwrap_or_default();
         let b = parts
             .next()
             .ok_or("missing b")?
-            .parse::<u32>()
+            .parse::<u8>()
             .unwrap_or_default();
 
         Ok(PlyVoxel { x, y, z, r, g, b })

@@ -3,12 +3,14 @@ use cgmath::Point3;
 #[derive(Clone, Copy, Debug)]
 pub struct Voxel {
     position: Point3<u32>,
-    material: u32,
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
 impl Voxel {
-    pub fn new(position: Point3<u32>, material: u32) -> Voxel {
-        Voxel { position, material }
+    pub fn new(position: Point3<u32>, r: u8, g: u8, b: u8) -> Voxel {
+        Voxel { position, r, g, b }
     }
 
     pub fn position(&self) -> Point3<u32> {
@@ -20,6 +22,7 @@ impl Voxel {
     }
 
     pub fn material(&self) -> u32 {
-        self.material
+        let mat = 1 << 31 | (self.r as u32) << 16 | (self.g as u32) << 8 | self.b as u32;
+        return mat;
     }
 }

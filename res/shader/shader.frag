@@ -1,9 +1,10 @@
 #version 450
 
 #define INFINITY 1e10
-#define EPSILON 1e-6
+#define EPSILON 1e-4
 #define MAX_NODES 1024
-#define STACK_DEPTH 512
+#define MAX_STEPS 512
+#define MAX_STACK 16
 
 layout(location = 0) out vec4 outColor;
 
@@ -14,7 +15,7 @@ uniform mat4x4 proj_inverse;
 
 // Octree
 uniform vec3 octree_origin = vec3(-0.5, -0.5, -0.5);
-uniform float octree_size = 1;
+uniform float octree_size = 2;
 
 const vec3 offset_lookup[8] = {
     vec3(0, 0, 0),
@@ -28,23 +29,14 @@ const vec3 offset_lookup[8] = {
 };
 
 struct Node {
-    // todo: Think about using the first bit as a flag for leaf node. Then you could
-    // store the material in the same uint as the children.
-    // 
-    // 0: leaf node, otherwise internal node. If an internal node, the first child 
-    // is at child_start and the other children are at child_start + 1, child_start + 2, etc.
-    // nodes[0]: x0 y0 z0
-    // nodes[1]: x1 y0 z0
-    // nodes[2]: x0 y1 z0
-    // nodes[3]: x1 y1 z0
-    // nodes[4]: x0 y0 z1
-    // nodes[5]: x1 y0 z1
-    // nodes[6]: x0 y1 z1
-    // nodes[7]: x1 y1 z1
-    uint child_start;
+    // parent is the index of this node's parent
+    uint parent;
 
-    // material is packed with the rgb color components.  r<<16 | g<<8 | b
-    uint material;
+    // data contains either the material of the voxel or the start index of the children
+    // depending on the first bit of this field.
+    // If the first bit is set, this is a leaf node and the data contains the material.
+    // If the first bit is not set, this is an internal node and the data contains the start index
+    uint data;
 };
 
 layout(std430) buffer Nodes {
@@ -56,13 +48,6 @@ struct Ray {
     vec3 dir;
     vec3 dir_inv;
     vec3 color;
-    float near_hit;
-};
-
-struct CastStack {
-    uint node_index;
-    vec3 min;
-    float size;
 };
 
 struct Box {
@@ -77,7 +62,6 @@ Ray CreateRay(vec3 pos, vec3 dir)
     ray.dir = dir;
     ray.dir_inv = 1.0 / ray.dir;
     ray.color = vec3(0, 0, 0);
-    ray.near_hit = INFINITY;
 
     return ray;
 }
@@ -94,6 +78,11 @@ Ray CreateCameraRay() {
 }
 
 vec3 at(Ray ray, float t) {
+    return ray.pos + t * ray.dir;
+}
+
+// advance returns the ray's position advanced by t units
+vec3 advance(Ray ray, float t) {
     return ray.pos + t * ray.dir;
 }
 
@@ -117,16 +106,8 @@ bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
     return tmin < tmax;
 }
 
-float ray_plane_intersection(vec3 rayOrigin, vec3 rayDir, vec3 normal) {
-    float t = -dot(rayOrigin, normal) / dot(rayDir, normal);
-    if (t < 0.0) {
-        return INFINITY; // No hit
-    }
-    return t;
-}
-
-int signbit(float x) {
-    return int(floatBitsToInt(x) >> 31) & 1;
+bool box_contains(Box box, vec3 point) {
+    return all(lessThanEqual(box.min, point)) && all(lessThanEqual(point, box.max));
 }
 
 vec3 color_from_material(uint material) {
@@ -137,96 +118,80 @@ vec3 color_from_material(uint material) {
     ) / 255.0;
 }
 
-void hit(inout Ray ray) {
-    // stack of nodes to visit
+// interesct_octree returns the index of the node that the ray intersects with
+// and advances the ray's position to the intersection point.
+uint intersect_octree(inout Ray ray) {
+    vec3 parent_stack[MAX_STACK];
     uint stack_ptr = 0;
-    CastStack stack[STACK_DEPTH];
 
-    uint tmp_stack_ptr = 0;
-    CastStack tmp_stack[4];
+    uint current_node = 0;
+    vec3 origin = octree_origin;
+    float size = octree_size;
+    int i = 0;
+    for (i = 0; i < MAX_STEPS; i ++) {
+        Node current = nodes[current_node];
 
-    // push the root node
-    stack[stack_ptr++] = CastStack(
-        0, 
-        octree_origin,
-        octree_size
-    );
+        ray.color = vec3(float(current_node) / 10.0);
 
-    uint i = 0;
-    uint max_stack = 0;
-    uint color_updates = 0;
-    while (stack_ptr > 0 && stack_ptr < STACK_DEPTH && i < 1000) {
-        i++;
-        max_stack = max(max_stack, stack_ptr);
-        
-        // fetch node from the stack
-        CastStack item = stack[--stack_ptr];
-        Node node = nodes[item.node_index];
-        Box box = CreateBox(item.min, item.size);
+        // if this node is a leaf, return the index
+        if ((current.data & 0x80000000) != 0) {
+            ray.color = color_from_material(current.data);
+            return current_node;
+        }
 
-        float tmin;
-        float tmax;
+        // if the ray is past the current node, ascend to the parent
+        float tmin, tmax;
+        Box box = CreateBox(origin, size);
         if (!ray_box_intersection(box, ray, tmin, tmax)) {
-            // discard non-intersecting nodes
-            continue;
-        }
-
-        if (node.material != 0) {
-            // if a leaf node, update the color
-            ray.color = color_from_material(node.material);
-            return;
-        }
-
-        if (node.child_start == 0) {
-            // if a empty leaf, continue
-            continue;
-        }
-
-        // push the children to the stack with the closest on top
-        float t = tmin;
-        float child_size = item.size * 0.5;
-        for (int i = 0; i < 3; i ++) {
-            // calculate the id for the closest child
-            vec3 ray_pos = at(ray, t);
-            vec3 oriented_point = (ray_pos - item.min) * 2 / item.size; // 0 <= x < 2, with 0,0,0 being the min and 2,2,2 being the max
-            uvec3 test = uvec3(floor(oriented_point));
-            test = min(test, uvec3(1));
-            
-            uint index = test.x | test.y << 1 | test.z << 2;
-
-            // get the far intersection point for the child and update t
-            float tmin;
-            float tmax;
-            Box child_box = CreateBox(item.min + child_size * offset_lookup[index], child_size);
-            if (!ray_box_intersection(child_box, ray, tmin, tmax)) {
-                // non-intersection should never happen
-                ray.color = vec3(0, 1, 0);
-                return;
+            // if the ray is past the root node, return 0
+            if (current_node == 0) {
+                ray.color = vec3(1, 0, 1);
+                break;
             }
-
-            t = tmax + EPSILON;
-
-            // push the child to the temp stack
-            tmp_stack[tmp_stack_ptr++] = CastStack(
-                node.child_start + index,
-                item.min + child_size * offset_lookup[index],
-                child_size
-            );
+            
+            current_node = current.parent;
+            size *= 2;
+            origin = parent_stack[--stack_ptr];
+            continue;
         }
 
-        // push the children to the stack in reverse order
-        while (tmp_stack_ptr > 0) {
-            stack[stack_ptr++] = tmp_stack[--tmp_stack_ptr];
+        // if this node has no children and is not a leaf, ascent to the parent
+        if (current.data == 0) {
+            ray.pos = advance(ray, tmax + EPSILON);
+            current_node = current.parent;
+            size *= 2;
+            origin = parent_stack[--stack_ptr];
+            continue;
         }
+
+        //* this node has children
+        // advance the ray to the intersection point with this node
+        ray.pos = advance(ray, tmin);
+        
+        // select the correct child node
+        vec3 oriented_pos = (ray.pos - origin) * 2 / size;
+        ivec3 test_pos = ivec3(floor(oriented_pos));
+        test_pos = clamp(test_pos, ivec3(0), ivec3(1));
+
+        // store the parent node for later
+        parent_stack[stack_ptr++] = origin;
+
+        // decend to the child 
+        uint rel_child_index = test_pos.x | (test_pos.y << 1) | (test_pos.z << 2);
+        uint child_index = current.data + rel_child_index;
+        current_node = child_index;
+        size /= 2;
+        origin += offset_lookup[rel_child_index] * size;
     }
 
-    ray.color = vec3(1, 0, 0) * (float(i) / 50.0);
+    ray.color = vec3(i) / (MAX_STEPS);
+    return 0;
 }
 
 void main() {
     Ray ray = CreateCameraRay();
 
-    hit(ray);
+    uint intersection = intersect_octree(ray);
 
     outColor = vec4(ray.color, 1.0);
 }

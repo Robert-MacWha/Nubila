@@ -5,10 +5,14 @@ use super::{model::Model, voxel::Voxel};
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct Node {
-    child_start: u32,
-    material: u32,
+    parent: u32,
+    // data contains either the material of the voxel or the start index of the children
+    // depending on the first bit of this field.
+    // If the first bit is set, this is a leaf node and the data contains the material.
+    // If the first bit is not set, this is an internal node and the data contains the start index
+    data: u32,
 }
-implement_uniform_block!(Node, child_start, material);
+implement_uniform_block!(Node, parent, data);
 
 pub struct Octree {
     pos: Point3<u32>,
@@ -21,11 +25,8 @@ pub struct Octree {
 }
 
 impl Node {
-    pub fn new(child_start: u32, material: u32) -> Self {
-        Node {
-            child_start,
-            material,
-        }
+    pub fn new(parent: u32, data: u32) -> Self {
+        Node { parent, data }
     }
 }
 
@@ -78,18 +79,18 @@ impl Octree {
         for child in self.children.iter() {
             match &child.voxel {
                 Some(voxel) => {
-                    let node = Node::new(0, voxel.material());
+                    let node = Node::new(parent as u32, voxel.material());
                     nodes.push(node);
                 }
                 None => {
-                    let node = Node::new(0, 0);
+                    let node = Node::new(parent as u32, 0);
                     nodes.push(node);
                 }
             }
         }
 
         // update the parent node with the start index of the children
-        nodes[parent].child_start = child_start as u32;
+        nodes[parent].data = child_start as u32;
 
         // serialize all children recursively
         for (i, child) in self.children.iter().enumerate() {
@@ -176,7 +177,7 @@ mod tests {
             children: Vec::new(),
         };
 
-        let voxel = Voxel::new(Point3::new(0, 0, 0), 1);
+        let voxel = Voxel::new(Point3::new(0, 0, 0), 0, 0, 0);
         octree.insert(voxel);
 
         assert_eq!(octree.voxel.is_some(), true);
@@ -192,7 +193,7 @@ mod tests {
             children: Vec::new(),
         };
 
-        let voxel = Voxel::new(Point3::new(0, 0, 0), 1);
+        let voxel = Voxel::new(Point3::new(0, 0, 0), 0, 0, 0);
         octree.insert(voxel);
 
         assert_eq!(octree.voxel.is_none(), true);

@@ -39,10 +39,11 @@ impl Game for MyGame {
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
         let start = Instant::now();
-        let model = Model::new("res/model/monu2.ply");
+        let model = Model::new("res/model/monu1.ply");
         println!("Loaded model in {:?}", start.elapsed());
 
         let octree = Octree::new(&model).serialize();
+        // println!("Octree: {:?}", octree);
 
         let model_buffer = Buffer::new(
             ctx.window().display(),
@@ -81,6 +82,7 @@ impl Game for MyGame {
 
         self.camera.set_position(pos);
         self.camera.look_at(Point3::new(0.0, 0.0, 0.0));
+        // thread::sleep(Duration::from_millis(10));
     }
 
     fn render(&self, ctx: &mut Context) {

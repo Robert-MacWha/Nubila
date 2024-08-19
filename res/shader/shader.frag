@@ -55,6 +55,7 @@ struct Box {
     vec3 max;
 };
 
+//* Ray
 Ray CreateRay(vec3 pos, vec3 dir)
 {
     Ray ray;
@@ -86,6 +87,7 @@ vec3 advance(Ray ray, float t) {
     return ray.pos + t * ray.dir;
 }
 
+//* Box
 Box CreateBox(vec3 min, float size) {
     return Box (min, min + size);
 }
@@ -110,6 +112,7 @@ bool box_contains(Box box, vec3 point) {
     return all(lessThanEqual(box.min, point)) && all(lessThanEqual(point, box.max));
 }
 
+//* Bitwise hacks
 vec3 color_from_material(uint material) {
     return vec3(
         (material >> 16) & 0xff,
@@ -121,7 +124,7 @@ vec3 color_from_material(uint material) {
 // interesct_octree returns the index of the node that the ray intersects with
 // and advances the ray's position to the intersection point.
 uint intersect_octree(inout Ray ray) {
-    vec3 parent_stack[MAX_STACK];
+    uint rel_child_stack[MAX_STACK];
     uint stack_ptr = 0;
 
     uint current_node = 0;
@@ -154,8 +157,11 @@ uint intersect_octree(inout Ray ray) {
             float t = EPSILON;
             ray.pos = advance(ray, tmax + t);
             current_node = current.parent;
+
+            // undo the change made to origin when decending to the child
+            uint rel_child_index = rel_child_stack[--stack_ptr];
+            origin -= offset_lookup[rel_child_index] * size;
             size *= 2;
-            origin = parent_stack[--stack_ptr];
             continue;
         }
 
@@ -167,15 +173,15 @@ uint intersect_octree(inout Ray ray) {
         ivec3 test_pos = ivec3(floor(oriented_pos));
         test_pos = clamp(test_pos, ivec3(0), ivec3(1));
 
-        // store the parent node for later
-        parent_stack[stack_ptr++] = origin;
-
         // decend to the child 
         uint rel_child_index = test_pos.x | (test_pos.y << 1) | (test_pos.z << 2);
         uint child_index = current.data + rel_child_index;
         current_node = child_index;
         size /= 2;
         origin += offset_lookup[rel_child_index] * size;
+
+        // store the rel child index for later
+        rel_child_stack[stack_ptr++] = rel_child_index;
     }
 
     ray.color = vec3(i) / (MAX_STEPS);

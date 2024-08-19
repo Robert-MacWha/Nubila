@@ -1,6 +1,7 @@
 #version 450
 
 #define INFINITY 1e10
+#define EPSILON 1e-6
 #define MAX_NODES 1024
 #define STACK_DEPTH 512
 
@@ -14,27 +15,6 @@ uniform mat4x4 proj_inverse;
 // Octree
 uniform vec3 octree_origin = vec3(-0.5, -0.5, -0.5);
 uniform float octree_size = 1;
-
-// Lookup table for the order of children to visit based on the ray direction.
-// Optimized to visit closer children first.
-const uint order_lookup[8][8] = {
-    // +x +y +z
-    {0, 1, 2, 3, 4, 5, 6, 7}, 
-    // -x +y +z
-    {1, 0, 3, 2, 5, 4, 7, 6}, 
-    // +x -y +z
-    {2, 3, 0, 1, 6, 7, 4, 5}, 
-    // -x -y +z
-    {3, 2, 1, 0, 7, 6, 5, 4}, 
-    // +x +y -z
-    {4, 5, 6, 7, 0, 1, 2, 3}, 
-    // -x +y -z
-    {5, 4, 7, 6, 1, 0, 3, 2}, 
-    // +x -y -z
-    {6, 7, 4, 5, 2, 3, 0, 1}, 
-    // -x -y -z
-    {7, 6, 5, 4, 3, 2, 1, 0}  
-};
 
 const vec3 offset_lookup[8] = {
     vec3(0, 0, 0),
@@ -121,9 +101,9 @@ Box CreateBox(vec3 min, float size) {
     return Box (min, min + size);
 }
 
-bool intersection(Box box, Ray ray, out float tmin) {
+bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
     // https://tavianator.com/2022/ray_box_boundary.html
-    float tmax = INFINITY;
+    tmax = INFINITY;
     tmin = 0;
 
     for (int d = 0; d < 3; ++d) {
@@ -135,6 +115,14 @@ bool intersection(Box box, Ray ray, out float tmin) {
     }
 
     return tmin < tmax;
+}
+
+float ray_plane_intersection(vec3 rayOrigin, vec3 rayDir, vec3 normal) {
+    float t = -dot(rayOrigin, normal) / dot(rayDir, normal);
+    if (t < 0.0) {
+        return INFINITY; // No hit
+    }
+    return t;
 }
 
 int signbit(float x) {
@@ -154,6 +142,9 @@ void hit(inout Ray ray) {
     uint stack_ptr = 0;
     CastStack stack[STACK_DEPTH];
 
+    uint tmp_stack_ptr = 0;
+    CastStack tmp_stack[4];
+
     // push the root node
     stack[stack_ptr++] = CastStack(
         0, 
@@ -164,69 +155,72 @@ void hit(inout Ray ray) {
     uint i = 0;
     uint max_stack = 0;
     uint color_updates = 0;
-    while (stack_ptr > 0) {
-        max_stack = max(max_stack, stack_ptr);
+    while (stack_ptr > 0 && stack_ptr < STACK_DEPTH && i < 1000) {
         i++;
-        if (i > 1000) {
-            return;
-        }
-
-        if (stack_ptr > STACK_DEPTH) {
-            ray.color = vec3(1, 0.5, 1);
-            return;
-        }
-
+        max_stack = max(max_stack, stack_ptr);
+        
         // fetch node from the stack
         CastStack item = stack[--stack_ptr];
         Node node = nodes[item.node_index];
         Box box = CreateBox(item.min, item.size);
 
         float tmin;
-        if (!intersection(box, ray, tmin)) {
-            // discard missed nodes
-            continue;
-        }
-
-        if (tmin >= ray.near_hit) {
+        float tmax;
+        if (!ray_box_intersection(box, ray, tmin, tmax)) {
+            // discard non-intersecting nodes
             continue;
         }
 
         if (node.material != 0) {
             // if a leaf node, update the color
             ray.color = color_from_material(node.material);
-            ray.near_hit = tmin;
-            color_updates += 1;
+            return;
         }
 
         if (node.child_start == 0) {
-            // if it has no children, continue
+            // if a empty leaf, continue
             continue;
         }
 
-        // push non-empty children to the stack
-        // int sign_x = signbit(ray.dir.x);
-        // int sign_y = signbit(ray.dir.y);
-        // int sign_z = signbit(ray.dir.z);
-        // int index = sign_x << 2 | sign_y << 1 | sign_z;
-        // const uint order[8] = order_lookup[index];
-
+        // push the children to the stack with the closest on top
+        float t = tmin;
         float child_size = item.size * 0.5;
-        for (uint j = 0; j < 8; j++) {
-            uint i = j;
-            uint child_index = node.child_start + i;
-            Node child_node = nodes[child_index];
+        for (int i = 0; i < 3; i ++) {
+            // calculate the id for the closest child
+            vec3 ray_pos = at(ray, t);
+            vec3 oriented_point = (ray_pos - item.min) * 2 / item.size; // 0 <= x < 2, with 0,0,0 being the min and 2,2,2 being the max
+            uvec3 test = uvec3(floor(oriented_point));
+            test = min(test, uvec3(1));
+            
+            uint index = test.x | test.y << 1 | test.z << 2;
 
-            // only push non-empty nodes
-            if (child_node.material == 0 && child_node.child_start == 0) {
-                continue;
+            // get the far intersection point for the child and update t
+            float tmin;
+            float tmax;
+            Box child_box = CreateBox(item.min + child_size * offset_lookup[index], child_size);
+            if (!ray_box_intersection(child_box, ray, tmin, tmax)) {
+                // non-intersection should never happen
+                ray.color = vec3(0, 1, 0);
+                return;
             }
 
-            vec3 offset = offset_lookup[i];
-            stack[stack_ptr++] = CastStack(child_index, item.min + offset * child_size, child_size);
+            t = tmax + EPSILON;
+
+            // push the child to the temp stack
+            tmp_stack[tmp_stack_ptr++] = CastStack(
+                node.child_start + index,
+                item.min + child_size * offset_lookup[index],
+                child_size
+            );
+        }
+
+        // push the children to the stack in reverse order
+        while (tmp_stack_ptr > 0) {
+            stack[stack_ptr++] = tmp_stack[--tmp_stack_ptr];
         }
     }
 
-    ray.color = vec3(1, 1, 1) * (float(color_updates) / 2.0);
+    ray.color = vec3(1, 0, 0) * (float(i) / 50.0);
 }
 
 void main() {

@@ -1,10 +1,10 @@
 #version 450
+#extension GL_ARB_gpu_shader_int64 : enable
 
 #define INFINITY 1e10
 #define EPSILON 1e-3
 #define MAX_NODES 8092
 #define MAX_STEPS 1024
-#define MAX_STACK 16
 
 layout(location = 0) out vec4 outColor;
 
@@ -121,10 +121,22 @@ vec3 color_from_material(uint material) {
     ) / 255.0;
 }
 
+void push(inout uint stack_ptr, inout uint64_t stack, uint value) {
+    stack |= uint64_t(value) << (stack_ptr * 4);
+    stack_ptr++;
+}
+
+uint pop(inout uint stack_ptr, inout uint64_t stack) {
+    stack_ptr--;
+    uint val = uint((stack >> (stack_ptr * 4)) & 0xf);
+    stack &= ~(uint64_t(0xf) << (stack_ptr * 4));
+    return val;
+}
+
 // interesct_octree returns the index of the node that the ray intersects with
 // and advances the ray's position to the intersection point.
 uint intersect_octree(inout Ray ray) {
-    uint rel_child_stack[MAX_STACK];
+    uint64_t rel_child_stack;
     uint stack_ptr = 0;
 
     uint current_node = 0;
@@ -159,7 +171,8 @@ uint intersect_octree(inout Ray ray) {
             current_node = current.parent;
 
             // undo the change made to origin when decending to the child
-            uint rel_child_index = rel_child_stack[--stack_ptr];
+            // uint rel_child_index = rel_child_stack[--stack_ptr];
+            uint rel_child_index = pop(stack_ptr, rel_child_stack);
             origin -= offset_lookup[rel_child_index] * size;
             size *= 2;
             continue;
@@ -181,10 +194,11 @@ uint intersect_octree(inout Ray ray) {
         origin += offset_lookup[rel_child_index] * size;
 
         // store the rel child index for later
-        rel_child_stack[stack_ptr++] = rel_child_index;
+        // rel_child_stack[stack_ptr++] = rel_child_index;
+        push(stack_ptr, rel_child_stack, rel_child_index);
     }
 
-    ray.color = vec3(i) / (MAX_STEPS);
+    ray.color = vec3(i) / (MAX_STEPS / 2);
     return 0;
 }
 

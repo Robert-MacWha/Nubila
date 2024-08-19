@@ -1,9 +1,9 @@
 #version 450
 
 #define INFINITY 1e10
-#define EPSILON 1e-4
-#define MAX_NODES 1024
-#define MAX_STEPS 512
+#define EPSILON 1e-3
+#define MAX_NODES 8092
+#define MAX_STEPS 1024
 #define MAX_STACK 16
 
 layout(location = 0) out vec4 outColor;
@@ -14,8 +14,8 @@ uniform mat4x4 view_inverse;
 uniform mat4x4 proj_inverse;
 
 // Octree
-uniform vec3 octree_origin = vec3(-0.5, -0.5, -0.5);
-uniform float octree_size = 2;
+uniform vec3 octree_origin;
+uniform float octree_size;
 
 const vec3 offset_lookup[8] = {
     vec3(0, 0, 0),
@@ -142,22 +142,17 @@ uint intersect_octree(inout Ray ray) {
         // if the ray is past the current node, ascend to the parent
         float tmin, tmax;
         Box box = CreateBox(origin, size);
-        if (!ray_box_intersection(box, ray, tmin, tmax)) {
+
+        bool ascend = !ray_box_intersection(box, ray, tmin, tmax) || current.data == 0;
+        if (ascend) {
             // if the ray is past the root node, return 0
             if (current_node == 0) {
                 ray.color = vec3(1, 0, 1);
                 break;
             }
             
-            current_node = current.parent;
-            size *= 2;
-            origin = parent_stack[--stack_ptr];
-            continue;
-        }
-
-        // if this node has no children and is not a leaf, ascent to the parent
-        if (current.data == 0) {
-            ray.pos = advance(ray, tmax + EPSILON);
+            float t = EPSILON;
+            ray.pos = advance(ray, tmax + t);
             current_node = current.parent;
             size *= 2;
             origin = parent_stack[--stack_ptr];
@@ -166,7 +161,6 @@ uint intersect_octree(inout Ray ray) {
 
         //* this node has children
         // advance the ray to the intersection point with this node
-        ray.pos = advance(ray, tmin);
         
         // select the correct child node
         vec3 oriented_pos = (ray.pos - origin) * 2 / size;

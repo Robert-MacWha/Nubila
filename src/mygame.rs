@@ -1,4 +1,3 @@
-use core::time;
 use std::{
     thread,
     time::{Duration, Instant},
@@ -39,11 +38,10 @@ impl Game for MyGame {
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
         let start = Instant::now();
-        let model = Model::new("res/model/monu1.ply");
+        let model = Model::new("res/model/monu2.ply");
         println!("Loaded model in {:?}", start.elapsed());
 
         let octree = Octree::new(&model).serialize();
-        // println!("Octree: {:?}", octree);
 
         let model_buffer = Buffer::new(
             ctx.window().display(),
@@ -52,7 +50,11 @@ impl Game for MyGame {
             glium::buffer::BufferMode::Immutable,
         )
         .unwrap();
-        println!("model_buffer{:#?}", model_buffer);
+        println!(
+            "model_buffer: len={} size={:#?} bytes",
+            model_buffer.len(),
+            model_buffer.get_size()
+        );
 
         MyGame {
             screen,
@@ -82,7 +84,7 @@ impl Game for MyGame {
 
         self.camera.set_position(pos);
         self.camera.look_at(Point3::new(0.0, 0.0, 0.0));
-        // thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(10));
     }
 
     fn render(&self, ctx: &mut Context) {

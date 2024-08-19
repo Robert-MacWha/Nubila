@@ -18,6 +18,11 @@ pub struct Engine<G: Game> {
 
 impl<G: Game> Engine<G> {
     pub fn new() -> Self {
+        let _ = fern::Dispatch::new()
+            .level(log::LevelFilter::Info)
+            .chain(std::io::stdout())
+            .apply();
+
         let event_loop = glium::winit::event_loop::EventLoop::builder()
             .build()
             .expect("event loop");
@@ -34,18 +39,24 @@ impl<G: Game> Engine<G> {
     }
 
     pub fn run(&mut self) {
+        self.game.start(&mut self.context);
         // I don't like this pattern, but it's the best way I've found to let Engine
         // create event_loop and call run_app with a mutable reference to self.
         let event_loop = self.event_loop.take().expect("event_loop uninitialized");
         let _ = event_loop.run_app(self);
 
-        self.game.end();
+        self.game.end(&mut self.context);
     }
 
-    pub fn frame(&mut self) {
+    pub fn frame(&mut self, event_loop: &ActiveEventLoop) {
         self.context.time().update();
+
         self.game.update(&mut self.context);
         self.game.render(&mut self.context);
+
+        if self.context.exiting() {
+            event_loop.exit();
+        }
 
         self.context.window().request_redraw();
     }
@@ -100,7 +111,7 @@ impl<G: Game> ApplicationHandler for Engine<G> {
             //     todo!();
             // }
             WindowEvent::RedrawRequested => {
-                self.frame();
+                self.frame(event_loop);
             }
             _ => {}
         }

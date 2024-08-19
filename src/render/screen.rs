@@ -4,6 +4,8 @@ use glium::{backend::Facade, Frame, Surface};
 
 use super::{shader, vertex::Vertex};
 
+/// Screen is a struct that represents a screen in the game.
+/// It contains a shader program and geometry to cover the full window.
 pub struct Screen {
     program: glium::Program,
     vertex_buffer: glium::VertexBuffer<Vertex>,

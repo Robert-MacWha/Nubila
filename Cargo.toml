@@ -5,10 +5,19 @@ edition = "2021"
 
 [dependencies]
 cgmath = "0.18.0"
+chrono = "0.4.38"
+defer = "0.2.1"
+fern = "0.6.2"
 glium = "0.35"
 glutin-winit = "0.5.0"
-thiserror = "1.0.63"
+log = "0.4.22"
+plotters = "0.3.6"
 
 [[bin]]
 name = "nubila"
 path = "src/main.rs"
+
+[features]
+default = []
+benchmark = []
+game = []

@@ -29,7 +29,7 @@ impl Window {
 
         let attributes = winit::window::Window::default_attributes()
             .with_title("Nubila")
-            .with_inner_size(winit::dpi::PhysicalSize::new(800, 480))
+            .with_inner_size(winit::dpi::PhysicalSize::new(1200, 720))
             .with_min_inner_size(winit::dpi::PhysicalSize::new(200, 120));
 
         // First we start by opening a new Window
@@ -111,6 +111,10 @@ impl Window {
 
     pub fn display(&mut self) -> &mut Display<WindowSurface> {
         return &mut self.display;
+    }
+
+    pub fn window(&mut self) -> &mut winit::window::Window {
+        return &mut self.window;
     }
 
     pub fn size(&self) -> PhysicalSize<u32> {

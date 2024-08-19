@@ -21,6 +21,10 @@ impl Voxel {
         self.position = pos;
     }
 
+    pub fn color(&self) -> (u8, u8, u8) {
+        (self.r, self.g, self.b)
+    }
+
     pub fn material(&self) -> u32 {
         let mat = 1 << 31 | (self.r as u32) << 16 | (self.g as u32) << 8 | self.b as u32;
         return mat;

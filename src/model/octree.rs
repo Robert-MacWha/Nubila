@@ -66,6 +66,47 @@ impl Octree {
         return nodes;
     }
 
+    // Optimize optimizes the octree by merging all sibling nodes with the same material.
+    pub fn optimize(&mut self) {
+        self.optimize_recursive();
+    }
+
+    fn optimize_recursive(&mut self) {
+        if self.children.is_empty() {
+            return;
+        }
+
+        // iterate over all children and optimize them
+        for child in self.children.iter_mut() {
+            child.optimize_recursive();
+        }
+
+        // if the octree's children are all leaf nodes of the same type, merge
+        // them and turn this into a leaf node.
+        let mut color: (u8, u8, u8) = (0, 0, 0);
+        for child in self.children.iter() {
+            if !child.children.is_empty() {
+                return;
+            }
+
+            match &child.voxel {
+                Some(voxel) => {
+                    let voxel_color = voxel.color();
+                    if color == (0, 0, 0) {
+                        color = voxel_color;
+                    } else if color != voxel_color {
+                        return;
+                    }
+                }
+                None => return,
+            }
+        }
+
+        // merge the children into this node
+        self.voxel = Some(Voxel::new(self.pos, color.0, color.1, color.2));
+        self.children.clear();
+    }
+
     // serialize_recursive serializes the octree into a list of nodes recursively
     // in a breadth-first manner. The method ensures that siblings are stored
     // beside each other in a predictable order.

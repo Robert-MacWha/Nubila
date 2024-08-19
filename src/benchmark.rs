@@ -63,13 +63,15 @@ impl Game for Benchmark {
         log::info!("Model load: elapsed={:?}", model_start.elapsed());
 
         let octree_start = Instant::now();
-        let octree = octree::Octree::new(&model).serialize();
+        let mut octree = octree::Octree::new(&model);
+        octree.optimize();
+        let serialized = octree.serialize();
         log::info!("Octree build: elapsed={:?}", octree_start.elapsed());
 
         let buffer_start = Instant::now();
         let model_buffer = Buffer::new(
             ctx.window().display(),
-            octree.as_slice(),
+            serialized.as_slice(),
             glium::buffer::BufferType::UniformBuffer,
             glium::buffer::BufferMode::Immutable,
         )

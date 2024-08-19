@@ -104,6 +104,8 @@ impl Game for MyGame {
             view_inverse: view_inverse,
             proj_inverse: proj_inverse,
             Nodes: &self.model_buffer,
+            octree_origin: [-1 as f32, -1 as f32, -1 as f32],
+            octree_size: 2 as f32,
         };
 
         self.screen.draw(&mut target, uniforms);

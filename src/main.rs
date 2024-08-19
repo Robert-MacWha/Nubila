@@ -18,7 +18,7 @@ fn main() {
         engine.run();
     }
 
-    #[cfg(feature = "game")]
+    #[cfg(not(feature = "benchmark"))]
     {
         let mut engine = Engine::<MyGame>::new();
         engine.run();

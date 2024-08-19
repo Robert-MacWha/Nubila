@@ -2,7 +2,7 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 
 #define INFINITY 1e10
-#define EPSILON 1e-3
+#define EPSILON 1e-5
 #define MAX_NODES 8092
 #define MAX_STEPS 1024
 
@@ -133,6 +133,7 @@ uint pop(inout uint stack_ptr, inout uint64_t stack) {
     return val;
 }
 
+//* Rendering
 // interesct_octree returns the index of the node that the ray intersects with
 // and advances the ray's position to the intersection point.
 uint intersect_octree(inout Ray ray) {

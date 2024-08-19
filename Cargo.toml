@@ -18,6 +18,6 @@ name = "nubila"
 path = "src/main.rs"
 
 [features]
-default = []
-benchmark = []
+default = ["game"]
 game = []
+benchmark = []

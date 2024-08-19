@@ -132,9 +132,9 @@ impl Model {
         log::info!("Converted to model: elapsed={:?}", start.elapsed());
 
         self.size = Vector3::new(
-            (max.x - min.x) as u32,
-            (max.y - min.y) as u32,
-            (max.z - min.z) as u32,
+            (max.x - min.x + 1) as u32,
+            (max.y - min.y + 1) as u32,
+            (max.z - min.z + 1) as u32,
         );
 
         return Ok(());

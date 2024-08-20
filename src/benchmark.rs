@@ -64,9 +64,15 @@ impl Game for Benchmark {
 
         let octree_start = Instant::now();
         let mut octree = octree::Octree::new(&model);
-        octree.optimize();
-        let serialized = octree.serialize();
         log::info!("Octree build: elapsed={:?}", octree_start.elapsed());
+
+        let optimize_start = Instant::now();
+        octree.optimize();
+        log::info!("Octree optimize: elapsed={:?}", optimize_start.elapsed());
+
+        let serialize_start = Instant::now();
+        let serialized = octree.serialize();
+        log::info!("Octree serialize: elapsed={:?}", serialize_start.elapsed());
 
         let buffer_start = Instant::now();
         let model_buffer = Buffer::new(

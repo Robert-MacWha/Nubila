@@ -96,11 +96,6 @@ impl Model {
 
         let start = std::time::Instant::now();
         for line in lines {
-            // Skip comments
-            if line.starts_with("comment") || line.is_empty() {
-                continue;
-            }
-
             // injest vertex data
             let vertex = PlyVoxel::new(line)?;
 
@@ -144,38 +139,39 @@ impl Model {
 impl PlyVoxel {
     fn new(line: &str) -> Result<PlyVoxel, String> {
         let mut parts = line.split_whitespace();
-        let x = parts
-            .next()
-            .ok_or("missing x")?
-            .parse::<i32>()
-            .unwrap_or_default();
 
-        //? For whatever reason, magica voxel has the y and z axis swapped
-        let z = parts
-            .next()
-            .ok_or("missing z")?
-            .parse::<i32>()
-            .unwrap_or_default();
-        let y = parts
-            .next()
-            .ok_or("missing y")?
-            .parse::<i32>()
-            .unwrap_or_default();
-        let r = parts
-            .next()
-            .ok_or("missing r")?
-            .parse::<u8>()
-            .unwrap_or_default();
-        let g = parts
-            .next()
-            .ok_or("missing g")?
-            .parse::<u8>()
-            .unwrap_or_default();
-        let b = parts
-            .next()
-            .ok_or("missing b")?
-            .parse::<u8>()
-            .unwrap_or_default();
+        let (x, z, y, r, g, b) = (
+            parts
+                .next()
+                .ok_or("missing x")?
+                .parse::<i32>()
+                .map_err(|_| "invalid x")?,
+            parts
+                .next()
+                .ok_or("missing z")?
+                .parse::<i32>()
+                .map_err(|_| "invalid z")?,
+            parts
+                .next()
+                .ok_or("missing y")?
+                .parse::<i32>()
+                .map_err(|_| "invalid y")?,
+            parts
+                .next()
+                .ok_or("missing r")?
+                .parse::<u8>()
+                .map_err(|_| "invalid r")?,
+            parts
+                .next()
+                .ok_or("missing g")?
+                .parse::<u8>()
+                .map_err(|_| "invalid g")?,
+            parts
+                .next()
+                .ok_or("missing b")?
+                .parse::<u8>()
+                .map_err(|_| "invalid b")?,
+        );
 
         Ok(PlyVoxel { x, y, z, r, g, b })
     }

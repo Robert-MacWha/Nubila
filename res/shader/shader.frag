@@ -33,14 +33,21 @@ struct Node {
     uint parent;
 
     // data contains either the material of the voxel or the start index of the children
-    // depending on the first bit of this field.
-    // If the first bit is set, this is a leaf node and the data contains the material.
-    // If the first bit is not set, this is an internal node and the data contains the start index
+    // depending on the top bit of this field.
+    // If the top bit is set, this is a leaf node and the data contains the material.
+    // If the top bit is not set, this is an internal node and the data contains the start index
     uint data;
 };
 
 layout(std430) buffer Nodes {
     Node nodes[MAX_NODES];
+};
+
+layout(std430) buffer NodeRender {
+    // render_data contains the render data for this node.  The top bit is the render 
+    // flag, set if the node was seen in the first fragment pass.  The bottom 24 
+    // bits are the render color.
+    uint render_data[MAX_NODES];
 };
 
 struct Ray {
@@ -162,6 +169,7 @@ uint intersect_octree(inout Ray ray) {
         bool is_leaf = (current.data & 0x80000000) != 0;
         if (is_leaf) {
             ray.color = color_from_material(current.data);
+            ray.pos = origin;
             return current_node;
         }
 
@@ -215,20 +223,12 @@ uint intersect_octree(inout Ray ray) {
     return 0;
 }
 
-vec3 raycast (Ray ray) {
-    // initial world cast
-    uint intersection = intersect_octree(ray);
-    if (intersection == 0) {
-        return vec3(0.7, 0.8, 1);
-    }
-
-    return ray.color;
-}
-
 void main() {
     Ray ray = CreateCameraRay();
 
-    vec3 color = raycast(ray);
+    uint intersection = intersect_octree(ray);
+    render_data[intersection] = intersection;
 
+    vec3 color = vec3(intersection);
     outColor = vec4(color, 1.0);
 }

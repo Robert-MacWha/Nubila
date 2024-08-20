@@ -39,15 +39,12 @@ impl Game for MyGame {
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
         let start = Instant::now();
-        let model = Model::new("res/model/4x.ply");
+        let model = Model::new("res/model/monu2.ply");
         info!("Loaded model in {:?}", start.elapsed());
 
         let mut octree = Octree::new(&model);
         octree.optimize();
         let serialized = octree.serialize();
-        for line in &serialized {
-            info!("{:?}", line);
-        }
 
         let model_buffer = Buffer::new(
             ctx.window().display(),
@@ -84,9 +81,9 @@ impl Game for MyGame {
 
         self.i += 1;
 
-        let cam_x = (self.i as f32 / 200.0).sin() * 5.0;
-        let cam_z = (self.i as f32 / 200.0).cos() * 5.0;
-        let pos = cgmath::Point3::new(cam_x, 2.0, cam_z);
+        let cam_x = (self.i as f32 / 200.0).sin() * 3.0;
+        let cam_z = (self.i as f32 / 200.0).cos() * 3.0;
+        let pos = cgmath::Point3::new(cam_x, 1.0, cam_z);
 
         self.camera.set_position(pos);
         self.camera.look_at(Point3::new(0.0, 0.0, 0.0));

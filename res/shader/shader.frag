@@ -144,7 +144,6 @@ uint intersect_octree(inout Ray ray) {
     Box box = CreateBox(origin, size);
     float tmin, tmax;
     if (!ray_box_intersection(box, ray, tmin, tmax)) {
-        ray.color = vec3(0.7, 0.8, 1);
         return 0;
     }
 
@@ -159,8 +158,6 @@ uint intersect_octree(inout Ray ray) {
     for (i = 0; i < MAX_STEPS; i ++) {
         Node current = nodes[current_node];
 
-        ray.color = vec3(float(current_node) / 10.0);
-
         // if this node is a leaf, return the index
         bool is_leaf = (current.data & 0x80000000) != 0;
         if (is_leaf) {
@@ -169,7 +166,7 @@ uint intersect_octree(inout Ray ray) {
         }
 
         // if the ray is past the current node, ascend to the parent
-        Box box = CreateBox(origin, size);
+        box = CreateBox(origin, size);
     
         if (current.data == 0) {
             float tmin, tmax;
@@ -215,14 +212,23 @@ uint intersect_octree(inout Ray ray) {
         push(stack_ptr, rel_child_stack, rel_child_index);
     }
 
-    ray.color = vec3(i) / (MAX_STEPS);
     return 0;
+}
+
+vec3 raycast (Ray ray) {
+    // initial world cast
+    uint intersection = intersect_octree(ray);
+    if (intersection == 0) {
+        return vec3(0.7, 0.8, 1);
+    }
+
+    return ray.color;
 }
 
 void main() {
     Ray ray = CreateCameraRay();
 
-    uint intersection = intersect_octree(ray);
+    vec3 color = raycast(ray);
 
-    outColor = vec4(ray.color, 1.0);
+    outColor = vec4(color, 1.0);
 }

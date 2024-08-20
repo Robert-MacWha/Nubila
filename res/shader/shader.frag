@@ -2,7 +2,7 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 
 #define INFINITY 1e10
-#define EPSILON 1e-5
+#define EPSILON 1e-4
 #define MAX_NODES 8092
 #define MAX_STEPS 1024
 
@@ -94,8 +94,8 @@ Box CreateBox(vec3 min, float size) {
 
 bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
     // https://tavianator.com/2022/ray_box_boundary.html
-    tmax = INFINITY;
     tmin = 0;
+    tmax = INFINITY;
 
     for (int d = 0; d < 3; ++d) {
         float t1 = (box.min[d] - ray.pos[d]) * ray.dir_inv[d];
@@ -108,7 +108,7 @@ bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
     return tmin < tmax;
 }
 
-bool box_contains(Box box, vec3 point) {
+bool ray_in_box(Box box, vec3 point) {
     return all(lessThanEqual(box.min, point)) && all(lessThanEqual(point, box.max));
 }
 
@@ -137,12 +137,24 @@ uint pop(inout uint stack_ptr, inout uint64_t stack) {
 // interesct_octree returns the index of the node that the ray intersects with
 // and advances the ray's position to the intersection point.
 uint intersect_octree(inout Ray ray) {
+    vec3 origin = octree_origin;
+    float size = octree_size;
+
+    // advance the ray to the first intersection point
+    Box box = CreateBox(origin, size);
+    float tmin, tmax;
+    if (!ray_box_intersection(box, ray, tmin, tmax)) {
+        ray.color = vec3(0.7, 0.8, 1);
+        return 0;
+    }
+
+    ray.pos = advance(ray, tmin + EPSILON);
+
+    // march the ray
     uint64_t rel_child_stack;
     uint stack_ptr = 0;
 
     uint current_node = 0;
-    vec3 origin = octree_origin;
-    float size = octree_size;
     int i = 0;
     for (i = 0; i < MAX_STEPS; i ++) {
         Node current = nodes[current_node];
@@ -150,29 +162,36 @@ uint intersect_octree(inout Ray ray) {
         ray.color = vec3(float(current_node) / 10.0);
 
         // if this node is a leaf, return the index
-        if ((current.data & 0x80000000) != 0) {
+        bool is_leaf = (current.data & 0x80000000) != 0;
+        if (is_leaf) {
             ray.color = color_from_material(current.data);
             return current_node;
         }
 
         // if the ray is past the current node, ascend to the parent
-        float tmin, tmax;
         Box box = CreateBox(origin, size);
+    
+        if (current.data == 0) {
+            float tmin, tmax;
+            ray_box_intersection(box, ray, tmin, tmax);
+            ray.pos = advance(ray, tmax + EPSILON);
 
-        bool ascend = !ray_box_intersection(box, ray, tmin, tmax) || current.data == 0;
-        if (ascend) {
+            // ascend to the parent 
+            current_node = current.parent;
+            uint rel_child_index = pop(stack_ptr, rel_child_stack);
+            origin -= offset_lookup[rel_child_index] * size;
+            size *= 2;
+            continue;
+        }
+
+        if (!ray_in_box(box, ray.pos)) {
             // if the ray is past the root node, return 0
             if (current_node == 0) {
-                ray.color = vec3(1, 0, 1);
                 break;
             }
-            
-            float t = EPSILON;
-            ray.pos = advance(ray, tmax + t);
-            current_node = current.parent;
 
-            // undo the change made to origin when decending to the child
-            // uint rel_child_index = rel_child_stack[--stack_ptr];
+            // ascend to the parent 
+            current_node = current.parent;
             uint rel_child_index = pop(stack_ptr, rel_child_stack);
             origin -= offset_lookup[rel_child_index] * size;
             size *= 2;
@@ -180,8 +199,6 @@ uint intersect_octree(inout Ray ray) {
         }
 
         //* this node has children
-        // advance the ray to the intersection point with this node
-        
         // select the correct child node
         vec3 oriented_pos = (ray.pos - origin) * 2 / size;
         ivec3 test_pos = ivec3(floor(oriented_pos));
@@ -195,11 +212,10 @@ uint intersect_octree(inout Ray ray) {
         origin += offset_lookup[rel_child_index] * size;
 
         // store the rel child index for later
-        // rel_child_stack[stack_ptr++] = rel_child_index;
         push(stack_ptr, rel_child_stack, rel_child_index);
     }
 
-    ray.color = vec3(i) / (MAX_STEPS / 2);
+    ray.color = vec3(i) / (MAX_STEPS);
     return 0;
 }
 

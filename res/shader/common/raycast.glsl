@@ -1,103 +1,6 @@
-#version 450
-#extension GL_ARB_gpu_shader_int64 : enable
-
-#define INFINITY 1e10
-#define EPSILON 1e-4
-#define MAX_NODES 8092
-#define MAX_STEPS 1024
-
-layout(location = 0) out vec4 outColor;
-
-// Camera
-uniform ivec2 screen_size;
-uniform mat4x4 view_inverse;
-uniform mat4x4 proj_inverse;
-
-// Octree
-uniform vec3 octree_origin;
-uniform float octree_size;
-
-const vec3 offset_lookup[8] = {
-    vec3(0, 0, 0),
-    vec3(1, 0, 0),
-    vec3(0, 1, 0),
-    vec3(1, 1, 0),
-    vec3(0, 0, 1),
-    vec3(1, 0, 1),
-    vec3(0, 1, 1),
-    vec3(1, 1, 1)
-};
-
-struct Node {
-    // parent is the index of this node's parent
-    uint parent;
-
-    // data contains either the material of the voxel or the start index of the children
-    // depending on the top bit of this field.
-    // If the top bit is set, this is a leaf node and the data contains the material.
-    // If the top bit is not set, this is an internal node and the data contains the start index
-    uint data;
-};
-
-layout(std430) buffer Nodes {
-    Node nodes[MAX_NODES];
-};
-
-layout(std430) buffer NodeRender {
-    // render_data contains the render data for this node.  The top bit is the render 
-    // flag, set if the node was seen in the first fragment pass.  The bottom 24 
-    // bits are the render color.
-    uint render_data[MAX_NODES];
-};
-
-struct Ray {
-    vec3 pos;
-    vec3 dir;
-    vec3 dir_inv;
-    vec3 color;
-};
-
-struct Box {
-    vec3 min;
-    vec3 max;
-};
-
-//* Ray
-Ray CreateRay(vec3 pos, vec3 dir)
-{
-    Ray ray;
-    ray.pos = pos;
-    ray.dir = dir;
-    ray.dir_inv = 1.0 / ray.dir;
-    ray.color = vec3(0, 0, 0);
-
-    return ray;
-}
-
-Ray CreateCameraRay() {
-    vec2 uv = (gl_FragCoord.xy / screen_size) * 2 - 1;
-
-    vec3 pos = (view_inverse * vec4(0, 0, 0, 1)).xyz;
-    vec3 dir = (proj_inverse * vec4(uv, 0, 1)).xyz;
-    dir = (view_inverse * vec4(dir, 0)).xyz;
-    dir = normalize(dir);
-
-    return CreateRay(pos, dir);
-}
-
-vec3 at(Ray ray, float t) {
-    return ray.pos + t * ray.dir;
-}
-
-// advance returns the ray's position advanced by t units
-vec3 advance(Ray ray, float t) {
-    return ray.pos + t * ray.dir;
-}
-
-//* Box
-Box CreateBox(vec3 min, float size) {
-    return Box (min, min + size);
-}
+#include "common/box.glsl"
+#include "common/ray.glsl"
+#include "common/octree.glsl"
 
 bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
     // https://tavianator.com/2022/ray_box_boundary.html
@@ -117,27 +20,6 @@ bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
 
 bool ray_in_box(Box box, vec3 point) {
     return all(lessThanEqual(box.min, point)) && all(lessThanEqual(point, box.max));
-}
-
-//* Bitwise hacks
-vec3 color_from_material(uint material) {
-    return vec3(
-        (material >> 16) & 0xff,
-        (material >> 8) & 0xff,
-        material & 0xff
-    ) / 255.0;
-}
-
-void push(inout uint stack_ptr, inout uint64_t stack, uint value) {
-    stack |= uint64_t(value) << (stack_ptr * 4);
-    stack_ptr++;
-}
-
-uint pop(inout uint stack_ptr, inout uint64_t stack) {
-    stack_ptr--;
-    uint val = uint((stack >> (stack_ptr * 4)) & 0xf);
-    stack &= ~(uint64_t(0xf) << (stack_ptr * 4));
-    return val;
 }
 
 //* Rendering
@@ -168,8 +50,6 @@ uint intersect_octree(inout Ray ray) {
         // if this node is a leaf, return the index
         bool is_leaf = (current.data & 0x80000000) != 0;
         if (is_leaf) {
-            ray.color = color_from_material(current.data);
-            ray.pos = origin;
             return current_node;
         }
 
@@ -221,14 +101,4 @@ uint intersect_octree(inout Ray ray) {
     }
 
     return 0;
-}
-
-void main() {
-    Ray ray = CreateCameraRay();
-
-    uint intersection = intersect_octree(ray);
-    render_data[intersection] = intersection;
-
-    vec3 color = vec3(intersection);
-    outColor = vec4(color, 1.0);
 }

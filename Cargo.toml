@@ -10,6 +10,7 @@ defer = "0.2.1"
 fern = "0.6.2"
 glium = "0.35"
 glutin-winit = "0.5.0"
+image = "0.25.2"
 log = "0.4.22"
 plotters = "0.3.6"
 

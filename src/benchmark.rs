@@ -5,7 +5,7 @@ use defer::defer;
 use glium::{buffer::Buffer, Surface};
 use plotters::{
     chart::ChartBuilder,
-    prelude::{self, BitMapBackend, IntoDrawingArea, PathElement},
+    prelude::{self, BitMapBackend, IntoDrawingArea},
     series::LineSeries,
     style::colors,
 };
@@ -53,7 +53,6 @@ impl Game for Benchmark {
             ctx.window().display(),
             "res/shader/shader.vert",
             "res/shader/shader.frag",
-            None,
         );
 
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
@@ -126,7 +125,7 @@ impl Game for Benchmark {
     }
 
     fn render(&self, ctx: &mut Context) {
-        let mut target = ctx.window().start_draw();
+        let mut target = ctx.window().draw();
         target.clear_color(0.0, 0.0, 1.0, 1.0);
 
         let screen_size = (
@@ -147,7 +146,7 @@ impl Game for Benchmark {
         };
 
         self.screen.draw(&mut target, uniforms);
-        ctx.window().end_draw(target);
+        target.finish().expect("Window draw failed");
     }
 
     fn end(&mut self, _: &mut Context) {

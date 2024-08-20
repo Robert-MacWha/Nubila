@@ -125,12 +125,8 @@ impl Window {
         return self.size.width as f64 / self.size.height as f64;
     }
 
-    pub fn start_draw(&mut self) -> Frame {
+    pub fn draw(&mut self) -> Frame {
         return self.display.draw();
-    }
-
-    pub fn end_draw(&self, f: Frame) {
-        f.finish().unwrap();
     }
 
     pub fn request_redraw(&self) {

@@ -5,6 +5,7 @@
 #include "common/define.glsl"
 #include "common/bitwise.glsl"
 #include "common/raycast.glsl"
+#include "common/node_buffer.glsl"
 
 // Pixel to Voxel manages the first rendering pass - determining which voxels
 // corespond to which pixels.  The shader casts rays from each pixel, colours
@@ -14,21 +15,15 @@
 layout(location = 0) out uvec4 outColor;
 
 // Camera
-uniform ivec2 screen_size;
+uniform uvec2 screen_size;
 uniform mat4x4 view_inverse;
 uniform mat4x4 proj_inverse;
-
-layout(std430, binding = 0) buffer NodeRender {
-    // render_data contains the render data for this node.  The top bit is the render 
-    // flag, set if the node was seen in the first fragment pass.  The bottom 24 
-    // bits are the render color.
-    uint render_data[MAX_NODES];
-};
 
 void main() {
     Ray ray = CreateCameraRay(gl_FragCoord.xy, screen_size, view_inverse, proj_inverse);
 
-    uint node_id = intersect_octree(ray);
+    uint skips = 0;
+    uint node_id = intersect_octree(ray, skips);
     if (node_id > MAX_NODES || node_id == 0) {
         outColor = uvec4(0, 0, 0, 0);
         return;
@@ -40,7 +35,7 @@ void main() {
     
     // pack render_data
     uint data = u8x4_to_u32(uvec4(node_color, 1));
-    render_data[node_id] = data;
+    node_buffer[node_id] = data;
 
     // assign the pixel to the encoded hit_id ID
     uvec4 encoded = u32_to_u8x4(node_id);

@@ -16,6 +16,9 @@ struct Node {
     // parent is the index of this node's parent
     uint parent;
 
+    // path is the path of steps to get from root to this node
+    uint path;
+
     // data contains either the material of the voxel or the start index of the children
     // depending on the top bit of this field.
     // If the top bit is set, this is a leaf node and the data contains the material.
@@ -23,7 +26,7 @@ struct Node {
     uint data;
 };
 
-layout(std430) buffer Nodes {
+layout(std430) buffer Octree {
     //? For whatever reason, defining this as a fixed size array causes the shader 
     //? to take *forever* to compile for larger MAX_NODES values.  I'm not sure why.
     //? Seems to be an ongoing issue. 

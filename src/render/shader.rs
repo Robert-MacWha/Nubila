@@ -1,21 +1,104 @@
 use std::{fs, path::Path, time::Instant};
 
-use glium::{backend::Facade, program::Program, ProgramCreationError};
-use log::info;
+use glium::{
+    backend::Facade,
+    program::{ComputeShader, Program},
+    uniforms::Uniforms,
+};
+use log::{error, info};
 
-pub fn program_from_path<F: ?Sized + Facade>(
-    facade: &F,
-    vertex: &String,
-    fragment: &String,
-) -> Result<Program, String> {
-    let vert_src = preprocess_shader(vertex);
-    let frag_src = preprocess_shader(fragment);
+pub struct ComputeProgram {
+    program: ComputeShader,
+    work_groups: (u32, u32, u32),
 
-    let start = Instant::now();
-    let prog = Program::from_source(facade, &vert_src, &frag_src, None);
-    info!("Loaded program in {:?}", start.elapsed());
+    comp: String,
+}
 
-    return prog.map_err(|e| e.to_string());
+pub struct RenderProgram {
+    program: Program,
+
+    vert: String,
+    frag: String,
+}
+
+impl ComputeProgram {
+    pub fn new<F: ?Sized + Facade>(facade: &F, comp: &str, work_groups: (u32, u32, u32)) -> Self {
+        let program = ComputeProgram::load(facade, comp).unwrap();
+        Self {
+            program,
+            work_groups,
+            comp: comp.to_string(),
+        }
+    }
+
+    pub fn reload<F: ?Sized + Facade>(&mut self, facade: &F) {
+        let program = ComputeProgram::load(facade, &self.comp);
+
+        if let Ok(program) = program {
+            self.program = program;
+        } else {
+            error!("Failed to reload compute shader: {:?}", program);
+        }
+    }
+
+    pub fn execute<U: Uniforms>(&self, uniforms: U) {
+        self.program.execute(
+            uniforms,
+            self.work_groups.0,
+            self.work_groups.1,
+            self.work_groups.2,
+        );
+    }
+
+    pub fn program(&self) -> &ComputeShader {
+        &self.program
+    }
+
+    fn load<F: ?Sized + Facade>(facade: &F, path: &str) -> Result<ComputeShader, String> {
+        let compute_src = preprocess_shader(path);
+        let prog = ComputeShader::from_source(facade, &compute_src);
+        return prog.map_err(|e| e.to_string());
+    }
+}
+
+impl RenderProgram {
+    pub fn new<F: ?Sized + Facade>(facade: &F, vert: &str, frag: &str) -> Self {
+        let program = RenderProgram::load(facade, vert, frag).unwrap();
+        Self {
+            program,
+            vert: vert.to_string(),
+            frag: frag.to_string(),
+        }
+    }
+
+    pub fn reload<F: ?Sized + Facade>(&mut self, facade: &F) {
+        let program = RenderProgram::load(facade, &self.vert, &self.frag);
+
+        if let Ok(program) = program {
+            self.program = program;
+        } else {
+            error!("Failed to reload render shader: {:?}", program);
+        }
+    }
+
+    pub fn program(&self) -> &Program {
+        &self.program
+    }
+
+    fn load<F: ?Sized + Facade>(
+        facade: &F,
+        vertex: &str,
+        fragment: &str,
+    ) -> Result<Program, String> {
+        let vert_src = preprocess_shader(vertex);
+        let frag_src = preprocess_shader(fragment);
+
+        let start = Instant::now();
+        let prog = Program::from_source(facade, &vert_src, &frag_src, None);
+        info!("Loaded program in {:?}", start.elapsed());
+
+        return prog.map_err(|e| e.to_string());
+    }
 }
 
 fn preprocess_shader<P: AsRef<Path>>(shader_path: P) -> String {

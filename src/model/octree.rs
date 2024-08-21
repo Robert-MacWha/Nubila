@@ -1,18 +1,24 @@
 use cgmath::{Point3, Vector3};
+use log::info;
 
 use super::{model::Model, voxel::Voxel};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct Node {
+    // parent is the index of this node's parent
     parent: u32,
+
+    // path is the path of steps to get from root to this node
+    path: u32,
+
     // data contains either the material of the voxel or the start index of the children
     // depending on the first bit of this field.
     // If the first bit is set, this is a leaf node and the data contains the material.
     // If the first bit is not set, this is an internal node and the data contains the start index
     data: u32,
 }
-implement_uniform_block!(Node, parent, data);
+implement_uniform_block!(Node, parent, path, data);
 
 pub struct Octree {
     pos: Point3<u32>,
@@ -25,8 +31,8 @@ pub struct Octree {
 }
 
 impl Node {
-    pub fn new(parent: u32, data: u32) -> Self {
-        Node { parent, data }
+    pub fn new(parent: u32, path: u32, data: u32) -> Self {
+        Node { parent, path, data }
     }
 }
 
@@ -37,6 +43,7 @@ impl Octree {
 
         //? Octree sizes must be a power of 2
         let size = size.next_power_of_two();
+        info!("Creating octree with size: {}", size);
 
         let mut root = Octree {
             pos: Point3::new(0, 0, 0),
@@ -56,12 +63,12 @@ impl Octree {
     // sequentially.
     pub fn serialize(&self) -> Vec<Node> {
         let mut nodes = Vec::new();
-        nodes.push(Node::new(0, 0)); // Root node
-                                     // nodes[0].size = self.size;
-                                     // nodes[0].pos = self.pos;
+        nodes.push(Node::new(0, 0, 0)); // Root node
+                                        // nodes[0].size = self.size;
+                                        // nodes[0].pos = self.pos;
 
         // serialize all children breadth-first
-        self.serialize_recursive(&mut nodes, 0);
+        self.serialize_recursive(&mut nodes, 0, 0, 0);
 
         return nodes;
     }
@@ -114,24 +121,26 @@ impl Octree {
     // Works by first appending all direct children to the node list, then
     // serializing the grandchildren and having them update their parents
     // with the start indices.
-    fn serialize_recursive(&self, nodes: &mut Vec<Node>, parent: usize) {
+    fn serialize_recursive(&self, nodes: &mut Vec<Node>, parent: usize, depth: u32, path: u32) {
         // iterate over all children and append them to the nodes list
         let child_start = nodes.len();
-        for child in self.children.iter() {
+        for (i, child) in self.children.iter().enumerate() {
+            let child_path: u32 = path | ((i as u32) << (depth * 3));
+
             match &child.voxel {
                 Some(voxel) => {
-                    let node = Node::new(parent as u32, voxel.material());
+                    let node = Node::new(parent as u32, child_path, voxel.material());
                     nodes.push(node);
                 }
                 None => {
-                    let node = Node::new(parent as u32, 0);
+                    let node = Node::new(parent as u32, child_path, 0);
                     nodes.push(node);
                 }
             }
         }
 
         // update the parent node with the start index of the children
-        nodes[parent].data = child_start as u32;
+        nodes[parent as usize].data = child_start as u32;
 
         // serialize all children recursively
         for (i, child) in self.children.iter().enumerate() {
@@ -141,7 +150,8 @@ impl Octree {
             }
 
             let child_index = child_start + i;
-            child.serialize_recursive(nodes, child_index);
+            let child_path: u32 = path | ((i as u32) << (depth * 3));
+            child.serialize_recursive(nodes, child_index, depth + 1, child_path);
         }
 
         return;

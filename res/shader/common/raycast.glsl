@@ -25,38 +25,47 @@ bool ray_in_box(Box box, vec3 point) {
 //* Rendering
 // interesct_octree returns the index of the node that the ray intersects with
 // and advances the ray's position to the intersection point.
-uint intersect_octree(inout Ray ray) {
-    vec3 origin = octree_origin;
-    float size = octree_size;
+uint intersect_octree(Ray ray, uint skips) {
+    ray.pos *= 8;
+    vec3 origin = octree_origin * 8;
+    float size = octree_size * 8;
 
     // advance the ray to the first intersection point
     Box box = CreateBox(origin, size);
-    float tmin, tmax;
-    if (!ray_box_intersection(box, ray, tmin, tmax)) {
-        return 0;
-    }
+    if (!ray_in_box(box, ray.pos)) {
+        float tmin, tmax;
+        if (!ray_box_intersection(box, ray, tmin, tmax)) {
+            return 0;
+        }
 
-    ray.pos = advance(ray, tmin + EPSILON);
+        ray.pos = advance(ray, tmin + EPSILON);
+    }
 
     // march the ray
     uint64_t rel_child_stack;
     uint stack_ptr = 0;
 
     uint current_node = 0;
-    int i = 0;
+    uint i = 0;
     for (i = 0; i < MAX_STEPS; i ++) {
         Node current = nodes[current_node];
 
         // if this node is a leaf, return the index
         bool is_leaf = (current.data & 0x80000000) != 0;
+        bool skipped = false;
         if (is_leaf) {
-            return current_node;
+            if (skips > 0) {
+                skips--;
+                skipped = true;
+            } else {
+                return current_node;
+            }
         }
 
         // if the ray is past the current node, ascend to the parent
         box = CreateBox(origin, size);
     
-        if (current.data == 0) {
+        if (current.data == 0 || skipped) {
             float tmin, tmax;
             ray_box_intersection(box, ray, tmin, tmax);
             ray.pos = advance(ray, tmax + EPSILON);

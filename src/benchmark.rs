@@ -140,7 +140,7 @@ impl Game for Benchmark {
             screen_size: screen_size,
             view_inverse: view_inverse,
             proj_inverse: proj_inverse,
-            Nodes: &self.model_buffer,
+            Octree: &self.model_buffer,
             octree_origin: OCTREE_ORIGIN,
             octree_size: OCTREE_SIZE,
         };

@@ -2,7 +2,7 @@ use std::{fs::File, io::Write, time::Instant};
 
 use cgmath::{Angle, Deg, Point3, SquareMatrix};
 use defer::defer;
-use glium::{buffer::Buffer, Surface};
+use glium::{buffer::Buffer, texture::UnsignedTexture2d, Surface};
 use plotters::{
     chart::ChartBuilder,
     prelude::{self, BitMapBackend, IntoDrawingArea},
@@ -23,8 +23,11 @@ struct FPSSnapshot {
 
 pub struct Benchmark {
     camera: Camera,
-    screen: Screen,
-    model_buffer: Buffer<[octree::Node]>,
+    intermediate_texture: UnsignedTexture2d,
+    intermediate_screen: Screen,
+    window_screen: Screen,
+    model_buffer: Buffer<[u32]>,
+    attribute_buffer: Buffer<[octree::Attribute]>,
 
     start: Instant,
     deg: Deg<f32>,
@@ -49,11 +52,28 @@ impl Game for Benchmark {
             start_time.elapsed()
         ));
 
-        let screen = Screen::new(
+        let intermediate_screen = Screen::new(
             ctx.window().display(),
-            "res/shader/shader.vert",
-            "res/shader/shader.frag",
+            "res/shader/screen.vert",
+            "res/shader/pixel_to_voxel.frag",
         );
+
+        let window_screen = Screen::new(
+            ctx.window().display(),
+            "res/shader/screen.vert",
+            "res/shader/pixel_paint.frag",
+        );
+
+        // texture
+        let size = ctx.window().size();
+        let intermediate_texture = UnsignedTexture2d::empty_with_format(
+            ctx.window().display(),
+            glium::texture::UncompressedUintFormat::U8U8U8U8,
+            glium::texture::MipmapsOption::NoMipmap,
+            size.width,
+            size.height,
+        )
+        .unwrap();
 
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
@@ -62,21 +82,28 @@ impl Game for Benchmark {
         log::info!("Model load: elapsed={:?}", model_start.elapsed());
 
         let octree_start = Instant::now();
-        let mut octree = octree::Octree::new(&model);
+        let octree = octree::Octree::from_model(&model);
         log::info!("Octree build: elapsed={:?}", octree_start.elapsed());
 
         let optimize_start = Instant::now();
-        octree.optimize();
         log::info!("Octree optimize: elapsed={:?}", optimize_start.elapsed());
 
         let serialize_start = Instant::now();
-        let serialized = octree.serialize();
+        let (nodes, attributes) = octree.serialize().expect("Failed to serialize octree");
         log::info!("Octree serialize: elapsed={:?}", serialize_start.elapsed());
 
         let buffer_start = Instant::now();
         let model_buffer = Buffer::new(
             ctx.window().display(),
-            serialized.as_slice(),
+            nodes.as_slice(),
+            glium::buffer::BufferType::UniformBuffer,
+            glium::buffer::BufferMode::Immutable,
+        )
+        .unwrap();
+
+        let attribute_buffer = Buffer::new(
+            ctx.window().display(),
+            attributes.as_slice(),
             glium::buffer::BufferType::UniformBuffer,
             glium::buffer::BufferMode::Immutable,
         )
@@ -89,9 +116,12 @@ impl Game for Benchmark {
         );
 
         Benchmark {
-            screen,
             camera,
+            intermediate_texture,
+            intermediate_screen,
+            window_screen,
             model_buffer,
+            attribute_buffer,
             start: Instant::now(),
             deg: Deg(0.0),
             fps_log: Vec::new(),
@@ -125,13 +155,9 @@ impl Game for Benchmark {
     }
 
     fn render(&self, ctx: &mut Context) {
-        let mut target = ctx.window().draw();
-        target.clear_color(0.0, 0.0, 1.0, 1.0);
-
-        let screen_size = (
-            ctx.window().size().width as i32,
-            ctx.window().size().height as i32,
-        );
+        //* Render voxels to texture
+        let mut intermediate_target = self.intermediate_texture.as_surface();
+        let screen_size: (u32, u32) = (ctx.window().size().width, ctx.window().size().height);
 
         let view_inverse: [[f32; 4]; 4] = self.camera.view_matrix().invert().unwrap().into();
         let proj_inverse: [[f32; 4]; 4] = self.camera.proj_matrix().invert().unwrap().into();
@@ -140,13 +166,30 @@ impl Game for Benchmark {
             screen_size: screen_size,
             view_inverse: view_inverse,
             proj_inverse: proj_inverse,
-            Octree: &self.model_buffer,
+            OctreeBuffer: &self.model_buffer,
+            AttributeBuffer: &self.attribute_buffer,
             octree_origin: OCTREE_ORIGIN,
             octree_size: OCTREE_SIZE,
         };
 
-        self.screen.draw(&mut target, uniforms);
-        target.finish().expect("Window draw failed");
+        self.intermediate_screen
+            .draw(&mut intermediate_target, uniforms);
+
+        //* Render texture to screen
+        let mut window_target = ctx.window().draw();
+        let sampler = self
+            .intermediate_texture
+            .sampled()
+            .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+            .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest);
+
+        let uniforms = uniform! {
+            screen_size: screen_size,
+            voxel_map: sampler,
+        };
+
+        self.window_screen.draw(&mut window_target, uniforms);
+        window_target.finish().expect("Window draw failed");
     }
 
     fn end(&mut self, _: &mut Context) {

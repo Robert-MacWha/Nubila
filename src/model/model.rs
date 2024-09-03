@@ -1,178 +1,121 @@
-use std::{
-    fs,
-    io::{BufRead, BufReader},
-};
+use std::fs::File;
 
 use cgmath::{Point3, Vector3};
+use linked_hash_map::LinkedHashMap;
+use ply_rs::ply::Property;
 
 use super::voxel::Voxel;
 
 pub struct Model {
     path: String,
     voxels: Vec<Voxel>,
-    size: Vector3<u32>,
-}
 
-struct PlyVoxel {
-    x: i32,
-    y: i32,
-    z: i32,
-    r: u8,
-    g: u8,
-    b: u8,
+    size: Vector3<u32>,
 }
 
 impl Model {
     pub fn new(path: &str) -> Self {
-        let voxels = Vec::new();
-        let size = Vector3::new(0, 0, 0);
-
-        let mut model = Model {
-            path: String::from(path),
-            size,
-            voxels,
-        };
-
-        model.load().expect("Failed to load model");
-
+        let model = Model::load_voxels(path).unwrap();
         return model;
     }
 
+    pub fn reload(&mut self) {
+        let model = Model::load_voxels(&self.path).unwrap();
+        self.voxels = model.voxels;
+        self.size = model.size;
+    }
+
     pub fn size(&self) -> Vector3<u32> {
-        self.size
+        return self.size;
     }
 
     pub fn voxels(&self) -> &Vec<Voxel> {
-        &self.voxels
+        return &self.voxels;
     }
 
-    pub fn reload(&mut self) {
-        match self.load() {
-            Ok(_) => println!("Model reloaded"),
-            Err(e) => eprintln!("Failed to reload model: {}", e),
-        }
-    }
+    fn load_voxels(path: &str) -> Result<Model, String> {
+        let mut f = File::open(path).expect("File not found");
 
-    /// Load a model from a file.
-    /// Only supports PLY files with ASCII format.
-    fn load(&mut self) -> Result<(), String> {
-        self.voxels.clear();
+        let p = ply_rs::parser::Parser::<ply_rs::ply::DefaultElement>::new();
+        let ply = p.read_ply(&mut f).expect("Error reading PLY file");
 
-        //* */ Read PLY file
-        let start = std::time::Instant::now();
-        let contents = fs::read_to_string(&self.path).map_err(|e| e.to_string())?;
-        let mut lines = contents.lines();
-        log::info!("Opened file: elapsed={:?}", start.elapsed());
-
-        let magic_number = lines.next().ok_or("missing magic number")?;
-        if magic_number != "ply" {
-            return Err("Invalid PLY file".to_string());
+        let vertice_count = ply.header.elements["vertex"].count;
+        if vertice_count == 0 {
+            return Err("No vertices found".to_string());
         }
 
-        let format = lines.next().ok_or("missing format")?;
-        if format != "format ascii 1.0" {
-            return Err(format!("Invalid PLY format: {}", format));
+        let ply_vertices = &ply.payload["vertex"];
+        if ply_vertices.len() != vertice_count as usize {
+            return Err("Wrong number of vertices".to_string());
         }
 
-        // Parse header
-        let start = std::time::Instant::now();
-        let mut vertex_count = 0;
-        for line in lines.by_ref() {
-            if line == "end_header" {
-                break;
-            }
-
-            if line.starts_with("element vertex") {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                vertex_count = parts[2].parse::<u32>().map_err(|e| e.to_string())?;
-            }
+        struct Vertice {
+            pos: Point3<f32>,
+            color: Point3<u8>,
         }
-        log::info!("Parsed header: elapsed={:?}", start.elapsed());
 
-        //* Parse file data
-        let mut ply_voxel: Vec<PlyVoxel> = Vec::with_capacity(vertex_count as usize);
-        let mut min = Vector3::new(i32::MAX, i32::MAX, i32::MAX);
-        let mut max = Vector3::new(i32::MIN, i32::MIN, i32::MIN);
+        // collect raw vertices
+        let mut floating_vertices: Vec<Vertice> = Vec::with_capacity(vertice_count);
+        let mut min: Point3<f32> = Point3::new(0.0, 0.0, 0.0);
+        let mut max: Point3<f32> = Point3::new(0.0, 0.0, 0.0);
+        for vertice in ply_vertices {
+            let x = Model::get_float_prop(vertice, "x").unwrap();
+            let y = Model::get_float_prop(vertice, "y").unwrap();
+            let z = -Model::get_float_prop(vertice, "z").unwrap(); //? Not sure why, but z is inverted
+            let r = Model::get_char_prop(vertice, "red").unwrap_or(1);
+            let g = Model::get_char_prop(vertice, "green").unwrap_or(1);
+            let b = Model::get_char_prop(vertice, "blue").unwrap_or(1);
 
-        let start = std::time::Instant::now();
-        for line in lines {
-            // injest vertex data
-            let vertex = PlyVoxel::new(line)?;
+            min = Point3::new(min.x.min(x), min.y.min(y), min.z.min(z));
+            max = Point3::new(max.x.max(x), max.y.max(y), max.z.max(z));
 
-            // Update min and max
-            min.x = min.x.min(vertex.x);
-            min.y = min.y.min(vertex.y);
-            min.z = min.z.min(vertex.z);
-
-            max.x = max.x.max(vertex.x);
-            max.y = max.y.max(vertex.y);
-            max.z = max.z.max(vertex.z);
-
-            // Append to vertices
-            ply_voxel.push(vertex);
+            floating_vertices.push(Vertice {
+                pos: Point3::new(x, y, z),
+                color: Point3::new(r, g, b),
+            });
         }
-        log::info!("Parsed data: elapsed={:?}", start.elapsed());
 
-        let start = std::time::Instant::now();
-        self.voxels.reserve(ply_voxel.len());
-        //* Convet to model
-        for vertex in ply_voxel {
-            let x = (vertex.x - min.x) as u32;
-            let y = (vertex.y - min.y) as u32;
-            let z = (vertex.z - min.z) as u32;
-
-            let voxel = Voxel::new(Point3::new(x, y, z), vertex.r, vertex.g, vertex.b);
-            self.voxels.push(voxel);
-        }
-        log::info!("Converted to model: elapsed={:?}", start.elapsed());
-
-        self.size = Vector3::new(
-            (max.x - min.x + 1) as u32,
-            (max.y - min.y + 1) as u32,
-            (max.z - min.z + 1) as u32,
+        // Normalize to Voxels
+        let mut voxels: Vec<Voxel> = Vec::with_capacity(vertice_count);
+        let size: Vector3<u32> = Vector3::new(
+            (max.x - min.x) as u32,
+            (max.y - min.y) as u32,
+            (max.z - min.z) as u32,
         );
+        for vertice in floating_vertices {
+            let position = Point3::new(
+                (vertice.pos.x - min.x) as u32,
+                (vertice.pos.y - min.y) as u32,
+                (vertice.pos.z - min.z) as u32,
+            );
 
-        return Ok(());
+            voxels.push(Voxel::new(position, vertice.color));
+        }
+
+        Ok(Model {
+            path: path.to_string(),
+            size,
+            voxels,
+        })
     }
-}
 
-impl PlyVoxel {
-    fn new(line: &str) -> Result<PlyVoxel, String> {
-        let mut parts = line.split_whitespace();
+    fn get_float_prop(vertice: &LinkedHashMap<String, Property>, key: &str) -> Result<f32, String> {
+        match vertice.get(key) {
+            Some(x) => match x {
+                Property::Float(x) => Ok(*x),
+                _ => Err(format!("Wrong type for {}", key)),
+            },
+            None => Err(format!("Missing {}", key)),
+        }
+    }
 
-        let (x, z, y, r, g, b) = (
-            parts
-                .next()
-                .ok_or("missing x")?
-                .parse::<i32>()
-                .map_err(|_| "invalid x")?,
-            parts
-                .next()
-                .ok_or("missing z")?
-                .parse::<i32>()
-                .map_err(|_| "invalid z")?,
-            parts
-                .next()
-                .ok_or("missing y")?
-                .parse::<i32>()
-                .map_err(|_| "invalid y")?,
-            parts
-                .next()
-                .ok_or("missing r")?
-                .parse::<u8>()
-                .map_err(|_| "invalid r")?,
-            parts
-                .next()
-                .ok_or("missing g")?
-                .parse::<u8>()
-                .map_err(|_| "invalid g")?,
-            parts
-                .next()
-                .ok_or("missing b")?
-                .parse::<u8>()
-                .map_err(|_| "invalid b")?,
-        );
-
-        Ok(PlyVoxel { x, y, z, r, g, b })
+    fn get_char_prop(vertice: &LinkedHashMap<String, Property>, key: &str) -> Result<u8, String> {
+        match vertice.get(key) {
+            Some(x) => match x {
+                Property::UChar(x) => Ok(*x),
+                _ => Err(format!("Wrong type for {}", key)),
+            },
+            None => Err(format!("Missing {}", key)),
+        }
     }
 }

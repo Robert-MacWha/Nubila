@@ -1,6 +1,4 @@
-use cgmath::{
-    perspective, Deg, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector3,
-};
+use cgmath::{perspective, Deg, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector3};
 
 pub struct Camera {
     pos: Point3<f32>,
@@ -55,7 +53,7 @@ impl Camera {
     }
 
     pub fn set_direction(&mut self, dir: Vector3<f32>) {
-        self.dir = dir;
+        self.dir = dir.normalize();
         self.refresh_matrix();
     }
 

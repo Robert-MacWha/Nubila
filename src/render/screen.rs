@@ -1,11 +1,6 @@
-use std::path::{Path, PathBuf};
+use glium::{backend::Facade, uniforms::Uniforms, Surface};
 
-use glium::{backend::Facade, uniforms::Uniforms, Frame, Surface};
-
-use super::{
-    shader::{self, RenderProgram},
-    vertex::Vertex,
-};
+use super::{shader::RenderProgram, vertex::Vertex};
 
 /// Screen is a struct that represents a screen in the game.
 /// It contains a shader program and geometry to cover the full window.

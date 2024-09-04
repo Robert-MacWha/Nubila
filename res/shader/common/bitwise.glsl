@@ -14,14 +14,12 @@ uint u8x4_to_u32(uvec4 value) {
             uint(value.a);
 }
 
-void push(inout uint stack_ptr, inout uint64_t stack, uint value) {
-    stack |= uint64_t(value) << (stack_ptr * 4);
-    stack_ptr++;
+uvec2 u64_to_uvec2(uint64_t value) {
+    uint low = uint(value & 0xFFFFFFFFu);  // Lower 32 bits
+    uint high = uint((value >> 32) & 0xFFFFFFFFu);  // Upper 32 bits
+    return uvec2(low, high);
 }
 
-uint pop(inout uint stack_ptr, inout uint64_t stack) {
-    stack_ptr--;
-    uint val = uint((stack >> (stack_ptr * 4)) & 0xf);
-    stack &= ~(uint64_t(0xf) << (stack_ptr * 4));
-    return val;
+uint64_t uvec2_to_u64(uvec2 value) {
+    return uint64_t(value.y) << 32 | uint64_t(value.x);
 }

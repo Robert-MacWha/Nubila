@@ -19,10 +19,11 @@ use crate::{
         model::Model,
         octree::{self, Octree},
     },
-    render::{camera::Camera, screen::Screen},
+    render::{camera::Camera, screen::Screen, shader::ComputeProgram},
 };
 
 const MAX_NODES: usize = 1_000_000;
+const COMPUTE_WORKGROUPS: usize = 1024;
 
 pub struct MyGame {
     camera: Camera,
@@ -30,13 +31,12 @@ pub struct MyGame {
     intermediate_texture: UnsignedTexture2d,
     intermediate_screen: Screen,
     window_screen: Screen,
+    shading_program: ComputeProgram,
     model_buffer: Buffer<[u32]>,
     attribute_buffer: Buffer<[octree::Attribute]>,
-    node_render_buffer: Buffer<[u32]>,
+    node_render_buffer: Buffer<[[u32; 2]]>,
 
-    i: u32,
     last_time: Instant,
-    frames: u32,
 }
 
 impl Game for MyGame {
@@ -58,6 +58,13 @@ impl Game for MyGame {
         );
         info!("Loaded screens in {:?}", start.elapsed());
 
+        // Compute shader
+        let shading_program = ComputeProgram::new(
+            ctx.window().display(),
+            "res/shader/voxel_shading.comp",
+            ((MAX_NODES / COMPUTE_WORKGROUPS) as u32, 1, 1),
+        );
+
         // texture
         let size = ctx.window().size();
         let intermediate_texture = UnsignedTexture2d::empty_with_format(
@@ -71,7 +78,7 @@ impl Game for MyGame {
 
         // buffers
         let start = Instant::now();
-        let model = Model::new("res/model/teapot.ply");
+        let model = Model::new("res/model/monu2.ply");
         info!("Loaded model in {:?}", start.elapsed());
 
         let octree = Octree::from_model(&model);
@@ -98,7 +105,7 @@ impl Game for MyGame {
         )
         .unwrap();
 
-        let node_render_buffer = Buffer::empty_array(
+        let node_render_buffer: Buffer<[[u32; 2]]> = Buffer::empty_array(
             ctx.window().display(),
             BufferType::ShaderStorageBuffer,
             MAX_NODES,
@@ -111,29 +118,25 @@ impl Game for MyGame {
             intermediate_texture,
             intermediate_screen,
             window_screen,
+            shading_program,
             model_buffer,
             attribute_buffer,
             node_render_buffer,
             last_time: Instant::now(),
-            frames: 0,
-            i: 0,
         }
     }
 
     fn update(&mut self, ctx: &mut Context) {
-        self.frames += 1;
         let elapsed = self.last_time.elapsed();
         if elapsed >= Duration::from_secs(1) {
-            info!("FPS: {}", self.frames);
-            self.frames = 0;
+            info!("FPS: {}", ctx.time().fps());
             self.last_time = Instant::now();
         }
 
-        self.i += 1;
-
-        let cam_x = (self.i as f32 / 300.0).sin() * 3.0;
-        // let cam_y = (self.i as f32 / 200.0).cos() * 1.0 + 2.0;
-        let cam_z = (self.i as f32 / 300.0).cos() * 3.0;
+        let f = ctx.time().frame_count();
+        let cam_x = (f as f32 / 300.0).sin() * 3.0;
+        // let cam_y = (f as f32 / 200.0).cos() * 1.0 + 2.0;
+        let cam_z = (f as f32 / 300.0).cos() * 3.0;
         let pos = cgmath::Point3::new(cam_x, 1.0, cam_z);
 
         self.camera.set_position(pos);
@@ -146,6 +149,12 @@ impl Game for MyGame {
     fn render(&self, ctx: &mut Context) {
         //* Render voxels to texture
         let mut intermediate_target = self.intermediate_texture.as_surface();
+        let intermediate_sampler = self
+            .intermediate_texture
+            .sampled()
+            .magnify_filter(MagnifySamplerFilter::Nearest)
+            .minify_filter(MinifySamplerFilter::Nearest);
+
         let screen_size: (u32, u32) = (ctx.window().size().width, ctx.window().size().height);
 
         let octree_origin: (f32, f32, f32) = (-1.0, -1.0, -1.0);
@@ -158,29 +167,23 @@ impl Game for MyGame {
             screen_size: screen_size,
             view_inverse: view_inverse,
             proj_inverse: proj_inverse,
+            voxel_map: intermediate_sampler,
             OctreeBuffer: &self.model_buffer,
             AttributeBuffer: &self.attribute_buffer,
             NodeBuffer: &self.node_render_buffer,
             octree_origin: octree_origin,
             octree_size: octree_size,
+            time: ctx.time().frame_count() as f32,
         };
 
         self.intermediate_screen
             .draw(&mut intermediate_target, uniforms);
 
+        //* Execute compute shader
+        self.shading_program.execute(uniforms);
+
         //* Render texture to screen
         let mut window_target = ctx.window().draw();
-        let sampler = self
-            .intermediate_texture
-            .sampled()
-            .magnify_filter(MagnifySamplerFilter::Nearest)
-            .minify_filter(MinifySamplerFilter::Nearest);
-
-        let uniforms = uniform! {
-            screen_size: screen_size,
-            voxel_map: sampler,
-            NodeBuffer: &self.node_render_buffer,
-        };
 
         self.window_screen.draw(&mut window_target, uniforms);
         window_target.finish().expect("Window draw failed");
@@ -191,6 +194,7 @@ impl Game for MyGame {
             Key::Character(c) if c == "r" => {
                 self.intermediate_screen.reload(ctx.window().display());
                 self.window_screen.reload(ctx.window().display());
+                self.shading_program.reload(ctx.window().display());
             }
             Key::Character(c) if c == "s" => {
                 let raw_image: RawImage2d<u8> = self.intermediate_texture.read();

@@ -1,4 +1,3 @@
 #define INFINITY 1e10
-#define EPSILON 1e-4
 #define MAX_NODES 1000000
 #define MAX_STEPS 1024

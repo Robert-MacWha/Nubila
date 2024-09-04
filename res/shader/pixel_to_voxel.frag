@@ -21,19 +21,24 @@ uniform mat4x4 proj_inverse;
 
 void main() {
     Ray ray = CreateCameraRay(gl_FragCoord.xy, screen_size, view_inverse, proj_inverse);
+    
+    vec3 ray_pos;
+    vec3 ray_dir;
+    ray_to_octree(ray, ray_pos, ray_dir);
 
     uint parent;
     float t;
-    vec3 debug = vec3(0);
-    bool hit = intersect_octree(ray, parent, t, debug);
+    uint64_t path;
+    vec3 debug;
+    bool hit = raymarch(ray_pos, ray_dir, 0, 0, parent, t, path, debug);
 
     if (!hit) {
-        outColor = uvec4(200, 200, 255, 1);
+        outColor = uvec4(0, 0, 0, 0);
         return;
     }
 
-    Attribute voxel = Attributes[parent];
-    vec3 voxel_color = vec3(u32_to_u8x4(voxel.rgb).yzw);
-    outColor = uvec4(voxel_color, 1);
+    // store the node that was hit and the path to it
+    outColor = u32_to_u8x4(parent);
+    node_buffer[parent] = u64_to_uvec2(path);  
     return;
 }

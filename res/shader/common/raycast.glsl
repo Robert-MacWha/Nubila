@@ -2,37 +2,59 @@
 #include "common/ray.glsl"
 #include "common/octree.glsl"
 
-bool ray_box_intersection(Box box, Ray ray, out float tmin, out float tmax) {
-    // https://tavianator.com/2022/ray_box_boundary.html
-    tmin = 0;
-    tmax = INFINITY;
+// Decodes a path, returning the position, scale and index of the voxel.
+// Position is given in octree space as the bottom-left corner of the voxel.
+// Scale is given in octree space as the side length of the voxel.
+void decode_path(uint64_t path, out vec3 pos, out float scale, out uint idx) {
+    pos = vec3(1, 1, 1);
+    idx = 0;
 
-    for (int d = 0; d < 3; ++d) {
-        float t1 = (box.min[d] - ray.pos[d]) * ray.dir_inv[d];
-        float t2 = (box.max[d] - ray.pos[d]) * ray.dir_inv[d];
+    uint current = Octree[0];
+    int max_scale = 23;
+    scale = 1;
 
-        tmin = min(max(t1, tmin), max(t2, tmin));
-        tmax = max(min(t1, tmax), min(t2, tmax));
+    for (int i = 0; i < max_scale; i++) {
+        //? Is current a leaf
+        if ((current & 0x00FFFFFF) == 0) {
+            break;
+        }
+
+        // Bottom 3 bits = the child index
+        uint child_shift = uint(path & 0x7);
+        path = path >> 3;
+        
+        // Update position based on the child index
+        scale *= 0.5;
+        if ((child_shift & 1) == 0) pos.x += scale;
+        if ((child_shift & 2) == 0) pos.y += scale;
+        if ((child_shift & 4) == 0) pos.z += scale;
+
+
+        // Find the offset for the next child in the octree array
+        uint child_offset = current & 0x00FFFFFF;  // Get bits 0-23 for the child offset
+        uint child_masks = ((current >> 24) & 0xFF);
+        uint mask = (1u << child_shift) - 1u;
+        uint masked_child_mask = child_masks & mask;
+        uint preceding_children = bitCount(masked_child_mask);
+        idx += child_offset;
+        idx += preceding_children;
+        current = Octree[idx];
     }
-
-    return tmin < tmax;
 }
 
-bool ray_in_box(Box box, vec3 point) {
-    return all(lessThanEqual(box.min, point)) && all(lessThanEqual(point, box.max));
+void ray_to_octree(Ray ray, out vec3 ray_pos, out vec3 ray_dir) {
+    ray_pos = (ray.pos - octree_origin) / octree_size + vec3(1);
+    ray_dir = normalize(ray.dir);
 }
 
 //* Rendering
 // interesct_octree returns the index of the node that the ray intersects with
 // and advances the ray's position to the intersection point.
-bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
-    debug = vec3(1, 0, 0);
-
-    float ray_scale = 0;
-    float hit_t = 0;
-    vec3 hit_pos = vec3(0);
-    int hit_idx = 0;
-    int hit_scale = 0;
+//
+// Assumes that the ray has been transformed into the octree's local space.
+bool raymarch(vec3 ray_pos, vec3 ray_dir, uint skips, float ray_scale, out uint parent, out float t, out uint64_t path, out vec3 debug) {
+    debug = vec3(0, 0, 0);
+    path = 0;
 
     const int max_scale = 23; // Maximum scale (number of float mantissa bits).
     const float epsilon = exp2(-max_scale);
@@ -40,8 +62,6 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
     ivec2 stack[max_scale + 1]; // parent voxel stack
 
     // Remove small directions from the ray
-    vec3 ray_pos = (ray.pos - octree_origin) / octree_size + vec3(1);
-    vec3 ray_dir = normalize(ray.dir);
     if (abs(ray_dir.x) < epsilon) ray_dir.x = epsilon;
     if (abs(ray_dir.y) < epsilon) ray_dir.y = epsilon;
     if (abs(ray_dir.z) < epsilon) ray_dir.z = epsilon;
@@ -81,6 +101,7 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
 
     // traverse the octree
     int i = 0;
+    uint last_skipped = 0;
     while (scale < max_scale && i < MAX_STEPS) {
         i += 1;
         debug.x = i;
@@ -90,9 +111,11 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
             current = Octree[parent];
         }
 
-        // Terminate if the voxel is a leaf.
-        if ((current & 0x00FFFFFF) == 0) {
-            break;
+        if (parent != last_skipped && (current & 0x00FFFFFF) == 0) {
+            if (skips <= 0) {
+                break;
+            }
+            skips -= 1;
         }
 
         // Determine maximum t-value of the cube by evaluating tx(), ty(), and tz() at its corner.
@@ -106,7 +129,7 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
         // Extract the valid mask (bits 24-31)
         uint child_masks = ((current >> 24) & 0xFF);
 
-        if (((child_masks & (1 << child_shift)) != 0) && (t_min <= t_max)) { // ? check top bit
+        if (((child_masks & (1 << child_shift)) != 0) && (t_min <= t_max)) {
             // Terminate if the voxel is small enough.
             if (tc_max * ray_scale >= scale_exp2) {
                 return true;
@@ -124,6 +147,8 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
 
             // Descend to the first child if the resulting t-span is non-empty.
             if (t_min <= tv_max) {
+                // Terminate if the voxel is a leaf.
+                
                 uint child_offset = current & 0x00FFFFFF; // get bits 0-23
 
                 // PUSH
@@ -133,11 +158,18 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
                 // Find the child descriptor for the current voxel.
                 uint mask = (1u << child_shift) - 1u;
                 uint masked_child_mask = child_masks & mask;
-                uint preceeding_children = bitCount(masked_child_mask);
-                uint p = parent;
+                uint preceding_children = bitCount(masked_child_mask);
                 parent += child_offset;
-                parent += preceeding_children;
+                parent += preceding_children;
 
+                // update the path
+                uint depth = (max_scale - scale) - 1;
+                uint bit_position = depth * 3;
+                uint64_t path_mask = ~(uint64_t(7) << bit_position);
+                path &= path_mask;
+                path |= (uint64_t(child_shift) << bit_position);
+
+                // update scale and position
                 idx = 0;
                 scale -= 1;
                 scale_exp2 = half_scale;
@@ -173,6 +205,7 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
             if ((step_mask & 1) != 0) { differing_bits |= floatBitsToInt(pos.x) ^ floatBitsToInt(pos.x + scale_exp2); }
             if ((step_mask & 2) != 0) { differing_bits |= floatBitsToInt(pos.y) ^ floatBitsToInt(pos.y + scale_exp2); }
             if ((step_mask & 4) != 0) { differing_bits |= floatBitsToInt(pos.z) ^ floatBitsToInt(pos.z + scale_exp2); }
+
             scale = (floatBitsToInt(float(differing_bits)) >> 23) - 127;
             scale_exp2 = uintBitsToFloat((scale - max_scale + 127) << 23);
 
@@ -202,5 +235,6 @@ bool intersect_octree(Ray ray, out uint parent, out float t, out vec3 debug) {
     }
 
     t = t_min;
+    debug = pos;
     return true;
 }

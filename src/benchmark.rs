@@ -23,8 +23,6 @@ struct FPSSnapshot {
 
 pub struct Benchmark {
     camera: Camera,
-    intermediate_texture: UnsignedTexture2d,
-    intermediate_screen: Screen,
     window_screen: Screen,
     model_buffer: Buffer<[u32]>,
     attribute_buffer: Buffer<[octree::Attribute]>,
@@ -52,28 +50,11 @@ impl Game for Benchmark {
             start_time.elapsed()
         ));
 
-        let intermediate_screen = Screen::new(
-            ctx.window().display(),
-            "res/shader/screen.vert",
-            "res/shader/pixel_to_voxel.frag",
-        );
-
         let window_screen = Screen::new(
             ctx.window().display(),
             "res/shader/screen.vert",
-            "res/shader/pixel_paint.frag",
+            "res/shader/benchmark.frag",
         );
-
-        // texture
-        let size = ctx.window().size();
-        let intermediate_texture = UnsignedTexture2d::empty_with_format(
-            ctx.window().display(),
-            glium::texture::UncompressedUintFormat::U8U8U8U8,
-            glium::texture::MipmapsOption::NoMipmap,
-            size.width,
-            size.height,
-        )
-        .unwrap();
 
         let camera = Camera::new(Deg(45.0), ctx.window().aspect_ratio() as f32);
 
@@ -117,8 +98,6 @@ impl Game for Benchmark {
 
         Benchmark {
             camera,
-            intermediate_texture,
-            intermediate_screen,
             window_screen,
             model_buffer,
             attribute_buffer,
@@ -155,12 +134,11 @@ impl Game for Benchmark {
     }
 
     fn render(&self, ctx: &mut Context) {
-        //* Render voxels to texture
-        let mut intermediate_target = self.intermediate_texture.as_surface();
         let screen_size: (u32, u32) = (ctx.window().size().width, ctx.window().size().height);
 
         let view_inverse: [[f32; 4]; 4] = self.camera.view_matrix().invert().unwrap().into();
         let proj_inverse: [[f32; 4]; 4] = self.camera.proj_matrix().invert().unwrap().into();
+        let mut window_target = ctx.window().draw();
 
         let uniforms = uniform! {
             screen_size: screen_size,
@@ -170,22 +148,6 @@ impl Game for Benchmark {
             AttributeBuffer: &self.attribute_buffer,
             octree_origin: OCTREE_ORIGIN,
             octree_size: OCTREE_SIZE,
-        };
-
-        self.intermediate_screen
-            .draw(&mut intermediate_target, uniforms);
-
-        //* Render texture to screen
-        let mut window_target = ctx.window().draw();
-        let sampler = self
-            .intermediate_texture
-            .sampled()
-            .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
-            .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest);
-
-        let uniforms = uniform! {
-            screen_size: screen_size,
-            voxel_map: sampler,
         };
 
         self.window_screen.draw(&mut window_target, uniforms);
